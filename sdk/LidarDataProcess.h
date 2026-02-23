@@ -1,8 +1,8 @@
 ﻿#ifndef __LIDARDATAPROCESS_H__
 #define __LIDARDATAPROCESS_H__
 
-#include"Global.h"
-#include"service/LidarWebService.h"
+#include <Global.h>
+#include <LidarWebService.h>
 
 #ifdef __unix__ 
     #include <sys/time.h>
@@ -34,16 +34,16 @@ struct Responsive
 {
     int32_t mode;//0x0043  0x0053  0x4753
     int32_t send_len;
-    char send_cmd[1024];
-    short rand;
-    long timestamp;
+    char    send_cmd[1024];
+    short   rand;
+    long    timestamp;
 };
 
 struct RunScript
 {
     //connect
-    char type[16];//"uart"   or   "udp"  "vpc"
-    char connectArg[16];        /// ip/com
+    char    type[16];//"uart"   or   "udp"  "vpc"
+    char    connectArg[16];        /// ip/com
     int32_t connectArg2;        /// port/baud
     int32_t local_port;
     //data
@@ -57,7 +57,7 @@ struct RunScript
     int32_t is_open_service;    /// CN:是否启用本地服务                   EN:Enable local service
     //udp
     int32_t is_group_listener;  /// CN:0正常模式   1监听模式   2发送模式  EN:0 Normal mode 1 Listening mode 2 Sending mode
-    char group_ip[16];          /// CN:组播IP   
+    char    group_ip[16];          /// CN:组播IP   
 
     // E120 scan filter
     ShadowsFilterParam shadows_filter;
@@ -85,7 +85,7 @@ struct RunScript
     int32_t direction;
     int32_t ats;  //1udp  2vpc
     //ntp
-    char ntp_ip[16];
+    char    ntp_ip[16];
     int32_t ntp_port;
     int32_t ntp_enable;
 };
@@ -94,14 +94,19 @@ struct RunScript
 struct RunConfig
 {   
     int32_t ID;
-    STATE state;    //-1 stop all 0 init   1 run work thread  2 run work and web thread 
+    // STATE:
+    //     -1 == stop all
+    //      0 == initialize
+    //      1 == running work thread
+    //      2 == running work and web thread 
+    STATE   state;
 
     pthread_t thread_data;
     pthread_t thread_web;
 
     LidarWebService *webservice;
-    int32_t fd;//句柄
-    printfMsg  callback;    //CN:信息打印回调函数                   EN:Information printing callback function
+    int32_t fd;             /// 句柄
+    printfMsg  callback;    /// CN:信息打印回调函数                   EN:Information printing callback function
     UserData userdata;//当前帧
     LidarMsgHdr zonemsg;//当前的防区信息
     EEpromV101 eepromv101;//全局变量参数
@@ -111,9 +116,9 @@ struct RunConfig
     //当前传入的指令
     int32_t mode;
     int32_t send_len;
-    char send_cmd[1024];
+    char    send_cmd[1024];
     int32_t recv_len;
-    char recv_cmd[1024];
+    char    recv_cmd[1024];
 
     RunScript  runscript;
 };

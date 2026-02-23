@@ -1,5 +1,5 @@
-﻿#ifndef _LIDAR_DATA
-#define  _LIDAR_DATA
+﻿#ifndef __LIDAR_DATA_H__
+#define __LIDAR_DATA_H__
 
 /**
  * Copyright (C),  Pacecat:(C) <LanHai>,All right reserved
@@ -118,6 +118,7 @@ struct FrameData
     pthread_mutex_t        datalock = PTHREAD_MUTEX_INITIALIZER;
     std::vector<DataPoint> data;
 };
+
 //最终返回的客户使用的雷达实时数据
 struct UserData
 {
@@ -129,6 +130,7 @@ struct UserData
     SpanData spandata;
     FrameData framedata;    
 };
+
 //报警包
 struct LidarMsgHdr
 {
@@ -145,6 +147,7 @@ struct LidarMsgHdr
     uint8_t all_states[32]; /// 设备各功能状态
     uint32_t reserved[11];  /// 保留
 };
+
 //E100系列过滤点云数据
 struct ShadowsFilterParam
 {
@@ -153,12 +156,14 @@ struct ShadowsFilterParam
     double min_angle, max_angle;
     int32_t window;
 };
+
 //E100系列过滤点云数据
 struct MedianFilterParam
 {
     int32_t enable;
     int32_t window;
 };
+
 //E330系列过滤离异点算法
 struct SeparationFilterParam
 {
@@ -295,47 +300,44 @@ struct  DevTimestamp
 
 struct EEpromV101
 {
-    char label[4];          // "EPRM"
-    uint16_t pp_ver; // 协议版本
-    uint16_t size;          // 结构大小
-
-    //uint32_t version;     // firmware version
+    char     label[4];      /// "EPRM"
+    uint16_t pp_ver;        /// 协议版本
+    uint16_t size;          /// 结构大小
 
     // device
-    uint8_t dev_sn[20];//sn号
-    uint8_t dev_type[16];//型号
-    uint32_t dev_id;        // 编号
+    uint8_t  dev_sn[20];     /// sn号
+    uint8_t  dev_type[16];   /// 型号
+    uint32_t dev_id;        /// 编号
 
     // network
-    uint8_t IPv4[4];
-    uint8_t mask[4];
-    uint8_t gateway[4];
-    uint8_t srv_ip[4];//上传IP
-    uint16_t srv_port;//上传端口
-    uint16_t local_port;//本地端口
+    uint8_t  IPv4[4];
+    uint8_t  mask[4];
+    uint8_t  gateway[4];
+    uint8_t  srv_ip[4];     /// 上传IP
+    uint16_t srv_port;      /// 上传端口
+    uint16_t local_port;    /// 本地端口
 
     uint16_t RPM;
-    uint16_t RPM_pulse;//电机启动参数
-    uint8_t fir_filter;//防区报警点数标准
-    uint8_t cir;//防区报警圈数过滤标准
+    uint16_t RPM_pulse;     /// 电机启动参数
+    uint8_t  fir_filter;    /// 防区报警点数标准
+    uint8_t  cir;           /// 防区报警圈数过滤标准
     uint16_t with_resample;
 
-    uint8_t auto_start;//开机自动旋转
-    uint8_t target_fixed;//固定上传
-    uint8_t with_smooth;//数据平滑
-    uint8_t with_filter;//去拖点
+    uint8_t auto_start;     /// 开机自动旋转
+    uint8_t target_fixed;   /// 固定上传
+    uint8_t with_smooth;    /// 数据平滑
+    uint8_t with_filter;    /// 去拖点
 
-    //
-    uint8_t ranger_bias[8];//零偏角错误修正
-    uint32_t net_watchdog;//看门狗
+    uint8_t  ranger_bias[8];/// 零偏角错误修正
+    uint32_t net_watchdog;  /// 看门狗
 
-    uint32_t pnp_flags;//PNP/NPN
-    uint16_t deshadow;//平滑系数
-    uint8_t zone_acted;//激活防区
-    uint8_t should_post;//上传方式   0 无数据 1仅数据 2报警 3报警+数据
+    uint32_t pnp_flags;     /// PNP/NPN
+    uint16_t deshadow;      /// 平滑系数
+    uint8_t  zone_acted;    /// 激活防区
+    uint8_t  should_post;   /// 上传方式, 0 无数据 1仅数据 2报警 3报警+数据
 
-    uint8_t functions_map[16];//I/O输入输出口
-    uint8_t reserved[36];
+    uint8_t  functions_map[16]; /// I/O输入输出口
+    uint8_t  reserved[36];
 };
 
 //CN:UDP设置雷达参数时接收使用报文头  EN:UDP uses the header when setting lidar parameters
@@ -387,76 +389,76 @@ struct DevInfo
     //启动脉冲个数    2个字节
     uint16_t pulse;
     //保留    4个字节
-    char sign[4];
+    char     sign[4];
     //版本号   2个字节
     uint16_t version;
     //ip地址  4个 字节
-    uint8_t ip[4];
+    uint8_t  ip[4];
     //子网掩码  4个字节
-    uint8_t mask[4];
+    uint8_t  mask[4];
     //网关地址  4个字节
-    uint8_t gateway[4];
+    uint8_t  gateway[4];
     //默认目标IP    4个字节
-    uint8_t remote_ip[4];
+    uint8_t  remote_ip[4];
     //默认目标udp端口号    2个字节
     uint16_t remote_udp;
     //默认UDP对外服务端口号  2个字节
     uint16_t port;
     //物体分辨率 1个字节
-    uint8_t fir;
+    uint8_t  fir;
     //偏置    6个字节
-    char zero_offset[6];
+    char     zero_offset[6];
     //机器序号  20个字节
-    char dev_sn[20];
+    char     dev_sn[20];
     //机器类型  11个字节
-    char dev_type[11];
+    char     dev_type[11];
     //IO类型选择    1个字节
-    char io_type;
+    char     io_type;
     //响应圈数  1个字节 
-    uint8_t cir;
+    uint8_t  cir;
     //IO功能引脚配置  10个字节
-    uint8_t io_mux[10];
+    uint8_t  io_mux[10];
 };
 
 struct DevInfo2
 {
-    // 标签   4个字节
-    char sign[4];
+    // 标签  4个字节
+    char     sign[4];
     // 机器序号 20个字节
-    char dev_sn[20];
+    char     dev_sn[20];
     // 机器类型 11个字节
-    char dev_type[12];
+    char     dev_type[12];
     //版本号   2个字节
     uint16_t version;
     // ip地址 4个 字节
-    uint8_t ip[4];
+    uint8_t  ip[4];
     // 子网掩码 4个字节
-    uint8_t mask[4];
+    uint8_t  mask[4];
     // 网关地址 4个字节
-    uint8_t gateway[4];
+    uint8_t  gateway[4];
     // 默认目标IP   4个字节
-    uint8_t remote_ip[4];
+    uint8_t  remote_ip[4];
     //默认目标udp端口号    2个字节
     uint16_t remote_udp;
     // 默认UDP对外服务端口号 2个字节
     uint16_t port;
     //保留    2个字节
-    char reserver[2];
+    char     reserved[2];
 };
 
 struct DevInfoV101
 {
-    char sign[4];  // must be "LiDA"
+    char     sign[4];  // must be "LiDA"
     uint32_t proto_version; // Ð­Òé°æ±¾ V101
     uint32_t timestamp[2];// Ê±¼ä´Á
-    char dev_sn[20];
-    char dev_type[16];
+    char     dev_sn[20];
+    char     dev_type[16];
     uint32_t version;
     uint32_t dev_id; //Éè±¸±àºÅ
-    uint8_t ip[4]; //Éè±¸µØÖ·
-    uint8_t mask[4]; //
-    uint8_t gateway[4];
-    uint8_t remote_ip[4]; // ·þÎñÆ÷µØÖ·
+    uint8_t  ip[4]; //Éè±¸µØÖ·
+    uint8_t  mask[4]; //
+    uint8_t  gateway[4];
+    uint8_t  remote_ip[4]; // ·þÎñÆ÷µØÖ·
 
     uint16_t remote_udp; //·þÎñÆ÷¶Ë¿Ú
     uint16_t port; // lidar service udp port
@@ -464,10 +466,10 @@ struct DevInfoV101
     uint16_t rpm; // µ±Ç°×ªËÙ
 
     uint16_t freq; // µ±Ç°×ªËÙ
-    uint8_t ranger_version[2];
+    uint8_t  ranger_version[2];
     uint16_t CpuTemp;
     uint16_t InputVolt;
-    uint8_t alarm[16]; // ±¨¾¯ÐÅÏ¢
+    uint8_t  alarm[16]; // ±¨¾¯ÐÅÏ¢
     uint32_t crc;
 };
 
@@ -484,11 +486,11 @@ enum ConnType
 struct DevConnInfo
 {
     ConnType type;
-    char com_port[128];
-    int32_t com_speed;
-    char conn_ip[32];
-    int32_t conn_port;
-    char timeStr[16];  //HH-MM-SS
+    char     com_port[128];
+    int32_t  com_speed;
+    char     conn_ip[32];
+    int32_t  conn_port;
+    char     timeStr[16];  //HH-MM-SS
     union {
         DevInfo v1;// info;
         DevInfoV101 v101;// info101;
@@ -496,4 +498,4 @@ struct DevConnInfo
     } info;
 };
 
-#endif
+#endif /// of __LIDAR_DATA_H__

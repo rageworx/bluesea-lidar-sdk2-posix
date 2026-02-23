@@ -1,5 +1,10 @@
 ﻿#include "Global.h"
 
+#ifdef _WIN32
+static WSADATA   wsda;
+#endif /// of _WIN32
+
+static size_t sockInstance = 0;
 static FanSegment_C7* GetFanSegment(const RawDataHdr7& hdr, uint8_t* pdat, bool with_chk);
 static FanSegment_AA* GetFanSegment(const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk);
 static int GetFanPointCount(FanSegment_C7* seg);
@@ -1411,11 +1416,8 @@ int SystemAPI::open_serial_port(const char* name, int speed)
 
 int SystemAPI::open_socket_port(int localhost)
 {
-#ifdef _WIN32
-	WSADATA   wsda; //   Structure   to   store   info   
-	WSAStartup(MAKEWORD(2, 2), &wsda);
-#endif // _WIN32
-
+    initSocket();
+    
 	int fd_udp = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if (fd_udp < 0)
 	{
@@ -2336,4 +2338,34 @@ bool AlgorithmAPI::filter(std::vector<DataPoint>  &output_scan, double max_range
     }
     //printf("%ld not valid num:%d\n",i,errnum);
     return true;
+}
+
+void initSocket()
+{
+#ifdef _WIN32
+    if ( sockInstance == 0 )
+    {
+        sockInstance++;
+        
+        if ( sockInstance == 1 )
+        {
+            WSAStartup(MAKEWORD(2, 2), &wsda);
+        }
+    }
+#endif /// of _WIN32
+}
+
+void finalSocket()
+{
+#ifdef _WIN32
+    if ( sockInstance > 0 )
+    {
+        sockInstance--;
+        
+        if ( sockInstance ==  0 )
+        {
+            WSACleanup();
+        }
+    }
+#endif /// of _WIN32
 }

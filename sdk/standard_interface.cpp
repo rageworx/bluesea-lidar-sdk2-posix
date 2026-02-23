@@ -11,7 +11,7 @@ BlueSeaLidarSDK *BlueSeaLidarSDK ::getInstance()
 
 void BlueSeaLidarSDK::deleteInstance()
 {
-	if (m_sdk)
+	if ( m_sdk != NULL )
 	{
 		delete m_sdk;
 		m_sdk = NULL;
@@ -19,9 +19,9 @@ void BlueSeaLidarSDK::deleteInstance()
 }
 
 BlueSeaLidarSDK::BlueSeaLidarSDK()
+ : m_idx( 0 ),
+   m_checkservice( NULL )
 {
-	m_idx = 0;
-	m_checkservice = NULL;
 }
 
 BlueSeaLidarSDK::~BlueSeaLidarSDK()

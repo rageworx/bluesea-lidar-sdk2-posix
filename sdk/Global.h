@@ -102,5 +102,7 @@ unsigned int stm32crc(unsigned int* ptr, unsigned int len);
 #endif
 
 bool judgepcIPAddrIsValid(const char* pcIPAddr);
+void initSocket();
+void finalSocket();
 
 #endif /// of __PACECATGLOBAL_H__

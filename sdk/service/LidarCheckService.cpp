@@ -91,10 +91,8 @@ void uptodate(DevConnInfo data)
 void* thread_heart(void* p)
 {
 	bool closeflag = *(bool*)p;
-#ifdef _WIN32
-	WSADATA   wsda; //   Structure   to   store   info   
-	WSAStartup(MAKEWORD(2, 2), &wsda);
-#endif
+
+    initSocket();
 	int sock = socket(AF_INET, SOCK_DGRAM, 0);
 
 	int yes = 1;
@@ -175,6 +173,8 @@ void* thread_heart(void* p)
 	}
     
 	SystemAPI::closefd(sock,true);
+    
+    finalSocket();
     
     pthread_exit( NULL );
 	return NULL;
