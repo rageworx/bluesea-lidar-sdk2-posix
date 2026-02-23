@@ -5,3 +5,6 @@
 /workspace/vc10/.vs/demo/v17/ipch/AutoPCH/95376d26f5ae85d9/LIDARWEBSERVICE.ipch
 /workspace/vc10/.vs/demo/v17/ipch/AutoPCH
 /workspace/vc10/.vs/demo/FileContentIndex
+bin/
+obj/
+Makefile
