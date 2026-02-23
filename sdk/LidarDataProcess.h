@@ -1,13 +1,13 @@
 ﻿#ifndef __LIDARDATAPROCESS_H__
-#define  __LIDARDATAPROCESS_H__
+#define __LIDARDATAPROCESS_H__
+
 #include"Global.h"
 #include"service/LidarWebService.h"
 
-#ifdef _WIN32
-
-#elif __unix__ 
-#include <sys/time.h>
+#ifdef __unix__ 
+    #include <sys/time.h>
 #endif
+
 typedef void (*printfMsg)(int, void*,int);
 
 enum ACTION
@@ -96,8 +96,8 @@ struct RunConfig
 	int ID;
 	STATE state;	//-1 stop all 0 init   1 run work thread  2 run work and web thread 
 
-	unsigned long thread_data;//DWORD == pthread_t
-	unsigned long thread_web;
+	pthread_t thread_data;
+	pthread_t thread_web;
 #endif 
 	LidarWebService *webservice;
 	int fd;//句柄

@@ -204,11 +204,11 @@ public:
 	 * @date:          2023-08-21
 	 * @description:   CN:设置雷达编号  EN:set lidar number
 	 * @Parameter:		1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
-	 *					2.number[unsigned int,IN]   CN：雷达的编号  EN:lidar number     
+	 *					2.number[uint32_t,IN]   CN：雷达的编号  EN:lidar number     
 	 * @return:        true/false
 	 * @others:        Repeatable, different from ID
 	 *************************************************/
-	bool SetDID(int ID,unsigned int number);
+	bool SetDID(int ID,uint32_t number);
 
 	/************************************************
 	 * @functionName:  SetNTP
@@ -216,12 +216,12 @@ public:
 	 * @description:   CN:设置雷达ntp参数  EN:set lidar ntp property
 	 * @Parameter:		1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
 	 *					2.ntp_ip[char*,IN]   CN：雷达的ntp ip  EN:lidar ntp upload ip   
-	 *					3.ntp_port[unsigned int,IN]   CN：雷达的ntp上传端口  EN:lidar ntp upload port     
+	 *					3.ntp_port[uint32_t,IN]   CN：雷达的ntp上传端口  EN:lidar ntp upload port     
 	 *					4.enable[bool,IN]   CN：使能  EN:enable    
 	 * @return:        true/false
 	 * @others:        Repeatable, different from ID
 	 *************************************************/
-	bool SetNTP(int ID,char*ntp_ip,unsigned int port,bool enable);
+	bool SetNTP(int ID,char*ntp_ip,uint16_t port,bool enable);
 
 
 	/************************************************

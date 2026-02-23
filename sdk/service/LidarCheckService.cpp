@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include "LidarCheckService.h"
 
 std::vector<DevConnInfo> m_infos;
@@ -17,14 +18,12 @@ void LidarCheckService::run()
 {
 	if (m_thread_heart != 0)
 		return;
-#ifdef __unix__
-	if (pthread_create(&m_thread_heart,NULL , thread_heart,&m_close_service) != 0)
-		return ;
-#elif _WIN32
-	if ((int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)thread_heart, &m_close_service, 0, &m_thread_heart) < 0)
-		return ;
-#endif
-	
+    
+	if ( pthread_create(&m_thread_heart, NULL, thread_heart, &m_close_service) != 0)
+    {
+        fprintf( stderr, "heartbeat thread failure.\n" );
+		return;
+    }
 }
 
 void LidarCheckService::stop()
@@ -46,6 +45,7 @@ void LidarCheckService::getTime_HMS(char* data)
 	int ss = t0 % 60;
 	sprintf(data, "%d-%d-%d", hh, mm, ss);
 }
+
 void LidarCheckService::clear()
 {
 	m_infos.clear();
@@ -65,10 +65,8 @@ void LidarCheckService::uartDevInfo()
 		strcpy(tmp.timeStr,"0");
 		uptodate(tmp);
 	}
-	
-
-	
 }
+
 void uptodate(DevConnInfo data)
 {
 	if (m_infos.size() == 0)
@@ -88,6 +86,7 @@ void uptodate(DevConnInfo data)
 	}
 	m_infos.push_back(data);
 }
+
 void* thread_heart(void* p)
 {
 	bool closeflag = *(bool*)p;
@@ -111,7 +110,6 @@ void* thread_heart(void* p)
 	int iResult = ::bind(sock, (struct sockaddr*)&addr, sizeof(addr));
 	if (iResult != 0)
 		return NULL;
-
 
 	struct ip_mreq mreq;
 	mreq.imr_multiaddr.s_addr = inet_addr("225.225.225.225");
@@ -174,6 +172,9 @@ void* thread_heart(void* p)
 			}
 		}
 	}
+    
 	SystemAPI::closefd(sock,true);
+    
+    pthread_exit( NULL );
 	return NULL;
 }

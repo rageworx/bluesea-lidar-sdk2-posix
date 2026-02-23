@@ -12,7 +12,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "../sdk/standard_interface.h"
+#include <standard_interface.h>
 
 // 传入回调指针的方式打印
 void CallBackMsg(int msgtype, void *param,int length)
@@ -105,10 +105,14 @@ void CallBackMsg(int msgtype, void *param,int length)
 		char tmp_gateway[16] = {0};
 		char tmp_srv_ip[16] = {0};
 
-		sprintf(tmp_IPv4, "%d.%d.%d.%d", eepromv101->IPv4[0], eepromv101->IPv4[1], eepromv101->IPv4[2], eepromv101->IPv4[3]);
-		sprintf(tmp_mask, "%d.%d.%d.%d", eepromv101->mask[0], eepromv101->mask[1], eepromv101->mask[2], eepromv101->mask[3]);
-		sprintf(tmp_gateway, "%d.%d.%d.%d", eepromv101->gateway[0], eepromv101->gateway[1], eepromv101->gateway[2], eepromv101->gateway[3]);
-		sprintf(tmp_srv_ip, "%d.%d.%d.%d", eepromv101->srv_ip[0], eepromv101->srv_ip[1], eepromv101->srv_ip[2], eepromv101->srv_ip[3]);
+		snprintf(tmp_IPv4, 16, "%d.%d.%d.%d", \
+                 eepromv101->IPv4[0], eepromv101->IPv4[1], eepromv101->IPv4[2], eepromv101->IPv4[3]);
+		snprintf(tmp_mask, 16, "%d.%d.%d.%d", \
+                 eepromv101->mask[0], eepromv101->mask[1], eepromv101->mask[2], eepromv101->mask[3]);
+		snprintf(tmp_gateway, 16, "%d.%d.%d.%d", \
+                 eepromv101->gateway[0], eepromv101->gateway[1], eepromv101->gateway[2], eepromv101->gateway[3]);
+		snprintf(tmp_srv_ip, 16, "%d.%d.%d.%d", \
+                 eepromv101->srv_ip[0], eepromv101->srv_ip[1], eepromv101->srv_ip[2], eepromv101->srv_ip[3]);
 
 		printf("dev info: ip地址:%s 子网掩码:%s 网关地址:%s 默认目标IP:%s  默认目标udp端口号:%d   默认UDP对外服务端口号:%d\n",
 			   tmp_IPv4, tmp_mask, tmp_gateway, tmp_srv_ip, eepromv101->srv_port, eepromv101->local_port);

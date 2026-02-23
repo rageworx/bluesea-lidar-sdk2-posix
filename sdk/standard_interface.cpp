@@ -1,5 +1,6 @@
 ﻿#include "standard_interface.h"
 #include "service/LidarWebService.h"
+
 BlueSeaLidarSDK *BlueSeaLidarSDK::m_sdk = new (std::nothrow) BlueSeaLidarSDK();
 ;
 
@@ -7,6 +8,7 @@ BlueSeaLidarSDK *BlueSeaLidarSDK ::getInstance()
 {
 	return m_sdk;
 }
+
 void BlueSeaLidarSDK::deleteInstance()
 {
 	if (m_sdk)
@@ -25,16 +27,18 @@ BlueSeaLidarSDK::BlueSeaLidarSDK()
 BlueSeaLidarSDK::~BlueSeaLidarSDK()
 {
 }
+
 RunConfig *BlueSeaLidarSDK::getLidar(int ID)
 {
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
-			return m_lidars.at(i);
+		if (m_lidars[i]->ID == ID)
+			return m_lidars[i];
 	}
 
 	return NULL;
 }
+
 int BlueSeaLidarSDK::addLidarByPath(const char *cfg_file_name)
 {
 	RunConfig *cfg = new RunConfig;
@@ -52,13 +56,13 @@ int BlueSeaLidarSDK::addLidarByPath(const char *cfg_file_name)
 
 bool BlueSeaLidarSDK::delLidarByID(int ID)
 {
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			if (m_lidars.at(i)->state == WORK || m_lidars.at(i)->state == WORK_AND_WEB)
+			if (m_lidars[i]->state == WORK || m_lidars[i]->state == WORK_AND_WEB)
 			{
-				m_lidars.at(i)->state = STOP_ALL;
+				m_lidars[i]->state = STOP_ALL;
 				sleep(1);
 			}
 			m_lidars.erase(m_lidars.begin() + i);
@@ -70,11 +74,11 @@ bool BlueSeaLidarSDK::delLidarByID(int ID)
 
 void BlueSeaLidarSDK::setCallBackPtr(int ID, printfMsg ptr)
 {
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			m_lidars.at(i)->callback = ptr;
+			m_lidars[i]->callback = ptr;
 		}
 	}
 }
@@ -82,11 +86,11 @@ void BlueSeaLidarSDK::setCallBackPtr(int ID, printfMsg ptr)
 bool BlueSeaLidarSDK::openDev(int ID)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
@@ -100,14 +104,8 @@ bool BlueSeaLidarSDK::openDev(int ID)
 		}
 		lidar->fd = fd;
 
-#ifdef __unix__
 		if (pthread_create(&lidar->thread_data, NULL, lidar_thread_proc_uart, lidar) != 0)
 			return false;
-#elif _WIN32
-		if ((int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)lidar_thread_proc_uart, lidar, 0, &lidar->thread_data) < 0)
-			return false;
-
-#endif
 	}
 	else if (strcmp(lidar->runscript.type, "udp") == 0)
 	{
@@ -117,13 +115,9 @@ bool BlueSeaLidarSDK::openDev(int ID)
 			return false;
 		}
 		lidar->fd = fd;
-#ifdef __unix__
+
 		if (pthread_create(&lidar->thread_data, NULL, lidar_thread_proc_udp, lidar) != 0)
 			return false;
-#elif _WIN32
-		if ((int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)lidar_thread_proc_udp, lidar, 0, &lidar->thread_data) < 0)
-			return false;
-#endif
 	}
 	else
 	{
@@ -161,11 +155,11 @@ bool BlueSeaLidarSDK::openDev(int ID)
 bool BlueSeaLidarSDK::GetDevInfo(int ID, EEpromV101 *eepromv101)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
@@ -198,11 +192,13 @@ bool BlueSeaLidarSDK::SetDevInfo(RunConfig *lidar, int num, char *cmd, int mode)
 	strcpy(lidar->send_cmd, cmd);
 	lidar->action = SETPARAM;
 	int index = 20;
+    
 	while (lidar->action != FINISH && index > 0)
 	{
 		msleep(100);
 		index--;
 	}
+    
 	if (lidar->action == FINISH)
 	{
 		if (strcmp(lidar->recv_cmd, "OK") == 0)
@@ -216,17 +212,18 @@ bool BlueSeaLidarSDK::SetDevInfo(RunConfig *lidar, int num, char *cmd, int mode)
 			return false;
 		}
 	}
+    
 	return false;
 }
 
 // 释放连接
 void BlueSeaLidarSDK::StopDev(int ID)
 {
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			m_lidars.at(i)->action = OFFLINE;
+			m_lidars[i]->action = OFFLINE;
 		}
 	}
 }
@@ -247,42 +244,39 @@ void *lidar_service(void *param)
 bool BlueSeaLidarSDK::OpenLocalService(int ID)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
 		return false;
 	lidar->webservice = new LidarWebService(lidar->runscript.service_port);
-#ifdef __unix__
+
 	if (pthread_create(&lidar->thread_web, NULL, lidar_service, &lidar->ID) != 0)
 		return false;
-#elif _WIN32
-	if ((int)CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)lidar_service, &lidar->ID, 0, &lidar->thread_web) < 0)
-		return false;
-#endif
+
 	return true;
 }
 // 关闭本地服务
 bool BlueSeaLidarSDK::CloseLocalService(int ID)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
 		return false;
 
-	if (m_lidars.at(ID)->state == WORK_AND_WEB)
+	if (m_lidars[ID]->state == WORK_AND_WEB)
 	{
-		m_lidars.at(ID)->state = WORK;
+		m_lidars[ID]->state = WORK;
 		return true;
 	}
 
@@ -295,9 +289,14 @@ bool BlueSeaLidarSDK::OpenHeartService()
 	{
 		m_checkservice = new LidarCheckService();
 	}
-	m_checkservice->run();
-	return true;
-	;
+    
+    if ( m_checkservice != NULL )
+	{
+        m_checkservice->run();
+        return true;
+    }
+    
+    return false;
 }
 
 bool BlueSeaLidarSDK::CloseHeartService()
@@ -310,11 +309,11 @@ bool BlueSeaLidarSDK::CloseHeartService()
 bool BlueSeaLidarSDK::ControlDrv(int ID, int num, char *cmd)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
@@ -348,11 +347,11 @@ bool BlueSeaLidarSDK::ControlDrv(int ID, int num, char *cmd)
 bool BlueSeaLidarSDK::ZoneSection(int ID, char section)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
@@ -362,7 +361,7 @@ bool BlueSeaLidarSDK::ZoneSection(int ID, char section)
 	if ((section >= 48 && section <= 57) || (section >= 65 && section <= 70))
 	{
 		char tmp[12] = {0};
-		sprintf(tmp, "LSAZN:%cH", section);
+		snprintf(tmp, 12, "LSAZN:%cH", section);
 		return SetDevInfo(lidar, strlen(tmp), tmp, S_PACK);
 	}
 
@@ -372,11 +371,11 @@ bool BlueSeaLidarSDK::ZoneSection(int ID, char section)
 bool BlueSeaLidarSDK::SetUDP(int ID, char *ip, char *mask, char *gateway, int port)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
@@ -389,7 +388,7 @@ bool BlueSeaLidarSDK::SetUDP(int ID, char *ip, char *mask, char *gateway, int po
 		return false;
 	}
 	char tmp[128] = {0};
-	sprintf(tmp, "LSUDP:%sH", result);
+	snprintf(tmp, 128, "LSUDP:%sH", result);
 	lidar->mode = S_PACK;
 	lidar->send_len = strlen(tmp);
 	strcpy(lidar->send_cmd, tmp);
@@ -401,11 +400,11 @@ bool BlueSeaLidarSDK::SetUDP(int ID, char *ip, char *mask, char *gateway, int po
 bool BlueSeaLidarSDK::SetDST(int ID, char *ip, int port)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
@@ -418,18 +417,18 @@ bool BlueSeaLidarSDK::SetDST(int ID, char *ip, int port)
 		return false;
 	}
 	char tmp[64] = {0};
-	sprintf(tmp, "LSDST:%sH", result);
+	snprintf(tmp, 64, "LSDST:%sH", result);
 	return SetDevInfo(lidar, strlen(tmp), tmp, S_PACK);
 }
 
 bool BlueSeaLidarSDK::SetRPM(int ID, int RPM)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
@@ -441,72 +440,72 @@ bool BlueSeaLidarSDK::SetRPM(int ID, int RPM)
 		return false;
 	}
 	char cmd[16] = {0};
-	sprintf(cmd, "LSRPM:%dH", RPM);
+	snprintf(cmd, 16, "LSRPM:%dH", RPM);
 	return SetDevInfo(lidar, strlen(cmd), cmd, C_PACK);
 }
 
 bool BlueSeaLidarSDK::SetTFX(int ID, bool tfx)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
 		return false;
 
 	char cmd[16] = {0};
-	sprintf(cmd, "LSTFX:%dH", tfx);
+	snprintf(cmd, 16, "LSTFX:%dH", tfx);
 	return SetDevInfo(lidar, strlen(cmd), cmd, S_PACK);
 }
 
 bool BlueSeaLidarSDK::SetDSW(int ID, bool dsw)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
 		return false;
 
 	char cmd[16] = {0};
-	sprintf(cmd, "LFFF%dH", dsw);
+	snprintf(cmd, 16, "LFFF%dH", dsw);
 	return SetDevInfo(lidar, strlen(cmd), cmd, C_PACK);
 }
 
 bool BlueSeaLidarSDK::SetSMT(int ID, bool smt)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
 		return false;
 
 	char cmd[16] = {0};
-	sprintf(cmd, "LSSS%dH", smt);
+	snprintf(cmd, 16, "LSSS%dH", smt);
 	return SetDevInfo(lidar, strlen(cmd), cmd, C_PACK);
 }
 
 bool BlueSeaLidarSDK::SetPST(int ID, int mode)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
@@ -516,36 +515,36 @@ bool BlueSeaLidarSDK::SetPST(int ID, int mode)
 		return false;
 
 	char cmd[16] = {0};
-	sprintf(cmd, "LSPST:%dH", mode);
+	snprintf(cmd, 16, "LSPST:%dH", mode);
 	return SetDevInfo(lidar, strlen(cmd), cmd, S_PACK);
 }
 
-bool BlueSeaLidarSDK::SetDID(int ID, unsigned int did)
+bool BlueSeaLidarSDK::SetDID(int ID, uint32_t did)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
 		return false;
 
 	char cmd[16] = {0};
-	sprintf(cmd, "LSDID:%dH", did);
+	snprintf(cmd, 16, "LSDID:%uH", did);
 	return SetDevInfo(lidar, strlen(cmd), cmd, S_PACK);
 }
 
-bool BlueSeaLidarSDK::SetNTP(int ID, char *ntp_ip, unsigned int port, bool enable)
+bool BlueSeaLidarSDK::SetNTP(int ID, char *ntp_ip, uint16_t port, bool enable)
 {
 	RunConfig *lidar = NULL;
-	for (unsigned int i = 0; i < m_lidars.size(); i++)
+	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
-		if (m_lidars.at(i)->ID == ID)
+		if (m_lidars[i]->ID == ID)
 		{
-			lidar = m_lidars.at(i);
+			lidar = m_lidars[i];
 		}
 	}
 	if (lidar == NULL)
@@ -583,7 +582,8 @@ bool BlueSeaLidarSDK::SetNTP(int ID, char *ntp_ip, unsigned int port, bool enabl
 		memcpy(ip_2, &ntp_ip[idx[0] + 1], idx[1] - idx[0] - 1);
 		memcpy(ip_3, &ntp_ip[idx[1] + 1], idx[2] - idx[1] - 1);
 		memcpy(ip_4, &ntp_ip[idx[2] + 1], ip_len - idx[2]);
-		sprintf(cmd, "LSNTP:%d,%03d.%03d.%03d.%03d,%05dH", enable, atoi(ip_1), atoi(ip_2), atoi(ip_3), atoi(ip_4), port);
+		snprintf(cmd, 64, "LSNTP:%d,%03d.%03d.%03d.%03d,%05uH", \
+                 enable, atoi(ip_1), atoi(ip_2), atoi(ip_3), atoi(ip_4), port);
 		return SetDevInfo(lidar, strlen(cmd), cmd, S_PACK);
 	}
 	return false;

@@ -3,13 +3,15 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
-#include <linux/termios.h> 
-//#include <sys/ioctl.h>
+#ifdef __linux__
+    #include <linux/termios.h> 
+#endif
 
 int ioctl(int fd, unsigned long request, ...);
 
 int change_baud(int fd, int baud)
-{  
+{ 
+#ifndef _WIN32 
 	struct termios2 t;  
 	if (ioctl(fd, TCGETS2, &t))    {     
 		return -1;
@@ -23,13 +25,11 @@ int change_baud(int fd, int baud)
 		return -2;
 	}
 
-#if 1
 	if (ioctl(fd, TCGETS2, &t) == 0)
-    	{      
-		printf("reported %d\n", t.c_ospeed); 
-       	}
+    {      
+    printf("reported %d\n", t.c_ospeed); 
+    }
 #endif
-
-       	return 0;
+    return 0;
 }
 
