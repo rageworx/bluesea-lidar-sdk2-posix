@@ -22,50 +22,52 @@ extern "C"
     #include <mongoose.h>
 }
 
-#define PI 3.1415926535898
+#ifndef PI
+    #define PI          (3.1415926535898)
+#endif /// of PI
 
-#define MAX_LIDARS 8
-#define MAX_FANS  100
-#define MAX_POINTS 550
+#define MAX_LIDARS      8
+#define MAX_FANS        100
+#define MAX_POINTS      550
 #define MAX_FRAMEPOINTS 10500
-#define MAX_FRAMEIDX  10000000
-#define HDR_SIZE 6
-#define HDR2_SIZE 8
-#define HDR3_SIZE 16 
-#define HDR7_SIZE 28 
-#define HDR99_SIZE 32 
-#define HDRAA_SIZE 48
+#define MAX_FRAMEIDX    10000000
+#define HDR_SIZE        6
+#define HDR2_SIZE       8
+#define HDR3_SIZE       16 
+#define HDR7_SIZE       28 
+#define HDR99_SIZE      32 
+#define HDRAA_SIZE      48
 
-#define BUF_SIZE 8*1024
-#define ZONE_SIZE 1024
-#define SLEEP_SIZE 5
-#define USER_SIZE  10
+#define BUF_SIZE        (8*1024)
+#define ZONE_SIZE       1024
+#define SLEEP_SIZE      5
+#define USER_SIZE       10
 
-#define ZS_PACK 0x5A53
-#define ZG_PACK 0x5A47
+#define ZS_PACK         0x5A53
+#define ZG_PACK         0x5A47
 
-#define GO_PACK 0x474F
-#define GT_PACK 0x4754
-#define G0_PACK 0x4730
-#define G1_PACK 0x4731
-#define GF_PACK 0x4746
+#define GO_PACK         0x474F
+#define GT_PACK         0x4754
+#define G0_PACK         0x4730
+#define G1_PACK         0x4731
+#define GF_PACK         0x4746
 
-#define FH_PACK 0x4648
-#define F_PACK 0x0046
-#define PO_PACK 0x504F
-#define P0_PACK 0x5030
-#define PT_PACK 0x5054
-#define P1_PACK 0x5031
-#define GS_PACK 0x4753
-#define S_PACK 0x0053
-#define T_PACK 0x0054
-#define C_PACK 0x0043
+#define FH_PACK         0x4648
+#define F_PACK          0x0046
+#define PO_PACK         0x504F
+#define P0_PACK         0x5030
+#define PT_PACK         0x5054
+#define P1_PACK         0x5031
+#define GS_PACK         0x4753
+#define S_PACK          0x0053
+#define T_PACK          0x0054
+#define C_PACK          0x0043
 
-#define CHECKSERVICE  6789  //检测本地雷达列表端口号
-#define getbit(x,y)   ((x) >> (y)&1)
-#define setbit(x,y) x|=(1<<y)         //将X的第Y位置1
-#define clrbit(x,y) x&=~(1<<y)            //将X的第Y位清0
-#define UNUSED(x) (void)(x)
+#define CHECKSERVICE    6789            /// 检测本地雷达列表端口号
+#define getbit(x,y)     ((x) >> (y)&1)
+#define setbit(x,y)     x|=(1<<y)       /// 将X的第Y位置1
+#define clrbit(x,y)     x&=~(1<<y)      /// 将X的第Y位清0
+#define UNUSED(x)       (void)(x)
 
 //CN：心跳检测包 EN：Heartbeat detection package
 struct KeepAlive {
@@ -78,9 +80,9 @@ struct KeepAlive {
 
 struct DataPoint
 {
-    float   angle;          //CN:弧度     EN:radian
-    float   distance;       //CN:距离(米)  EN:distance(Meter)
-    uint8_t confidence;     //CN:强度     EN:strength
+    float   angle;          /// CN:弧度      EN:radian
+    float   distance;       /// CN:距离(米)  EN:distance(Meter)
+    uint8_t confidence;     /// CN:强度      EN:strength
 };
 
 struct RawData
@@ -112,7 +114,7 @@ struct SpanData
 
 struct FrameData
 {
-    uint32_t               ts[2];       /// timestamps(Second and microseconds )
+    uint32_t               ts[2];   /// timestamps(Second and microseconds )
     pthread_mutex_t        datalock = PTHREAD_MUTEX_INITIALIZER;
     std::vector<DataPoint> data;
 };
@@ -120,9 +122,9 @@ struct FrameData
 struct UserData
 {
     DataType type;
-    int32_t idx;//0表示扇区序号  1表示帧序号  超过10000000(1千万)帧回拨
-    char connectArg1[16];     //ip/com
-    int32_t connectArg2;        //port /baud
+    int32_t idx;            /// 0表示扇区序号  1表示帧序号  超过10000000(1千万)帧回拨
+    char connectArg1[16];   /// ip/com
+    int32_t connectArg2;    /// port /baud
     //只有对应模式才有数据
     SpanData spandata;
     FrameData framedata;    
@@ -130,18 +132,18 @@ struct UserData
 //报警包
 struct LidarMsgHdr
 {
-    char sign[4];   // must be "LMSG"
-    uint32_t proto_version; //协议版本，当前为0x101
-    char dev_sn[20];    //设备编号
-    uint32_t dev_id;    //设备序号
-    uint32_t timestamp;     //时间戳
-    uint32_t flags; //消息类型
-    uint32_t events;    //消息内容的位组合
-    uint16_t id;    //消息序号
-    uint16_t extra; //（当前激活防区 + 设备各功能状态 + 保留）长度
-    uint32_t zone_actived;  //当前激活防区（范围0~F）
-    uint8_t all_states[32];//   设备各功能状态
-    uint32_t reserved[11];  //保留
+    char sign[4];           /// must be "LMSG"
+    uint32_t proto_version; /// 协议版本，当前为0x101
+    char dev_sn[20];        /// 设备编号
+    uint32_t dev_id;        /// 设备序号
+    uint32_t timestamp;     /// 时间戳
+    uint32_t flags;         /// 消息类型
+    uint32_t events;        /// 消息内容的位组合
+    uint16_t id;            /// 消息序号
+    uint16_t extra;         ///（当前激活防区 + 设备各功能状态 + 保留）长度
+    uint32_t zone_actived;  /// 当前激活防区（范围0~F）
+    uint8_t all_states[32]; /// 设备各功能状态
+    uint32_t reserved[11];  /// 保留
 };
 //E100系列过滤点云数据
 struct ShadowsFilterParam
@@ -176,51 +178,51 @@ struct SeparationFilterParam
 struct RawDataHdr
 {
     uint16_t code; //CN:帧头              EN:data frame header
-    uint16_t N;    //CN:扇区内测距点数 EN:The number of ranging points in the sector
+    uint16_t N;    //CN:扇区内测距点数    EN:The number of ranging points in the sector
     uint16_t angle;//CN:扇区起始角度      EN:Corresponding ranging angle
 };
 
 struct RawDataHdr2
 {
     uint16_t code;  //CN:帧头             EN:data frame header
-    uint16_t N;     //CN:扇区内测距点数        EN:The number of ranging points in the sector
-    uint16_t angle; //CN:扇区起始角度         EN:Sector starting angle
-    uint16_t span;  //CN:扇区大小           EN:sector size
+    uint16_t N;     //CN:扇区内测距点数   EN:The number of ranging points in the sector
+    uint16_t angle; //CN:扇区起始角度     EN:Sector starting angle
+    uint16_t span;  //CN:扇区大小         EN:sector size
 };
 
 struct RawDataHdr3
 {
     uint16_t code;  //CN:帧头             EN:data frame header
-    uint16_t N;     //CN:扇区内测距点数        EN:The number of ranging points in the sector
+    uint16_t N;     //CN:扇区内测距点数   EN:The number of ranging points in the sector
     uint16_t angle; //CN:扇区起始角度     EN:Corresponding ranging angle
-    uint16_t span;  //CN:扇区大小           EN:sectors size
+    uint16_t span;  //CN:扇区大小         EN:sectors size
     uint16_t fbase; //CN:扇区起始偏差     EN:Sector start offset
     uint16_t first; //CN:第一个点角度     EN:first point32_t angle
-    uint16_t last;  //CN:最后一个点角度        EN:last point32_t angle
+    uint16_t last;  //CN:最后一个点角度   EN:last point32_t angle
     uint16_t fend;  //CN:扇区终止偏差     EN:Sector end offset
 };
 
 struct RawDataHdr7 {
     uint16_t code;      //CN:帧头                     EN:data frame header
-    uint16_t N;         //CN:扇区内这个分包的测距点数   EN:The number of ranging points for this subpacket in the buffer
-    uint16_t whole_fan; //CN:缓冲区内总测距点数          EN:The total number of ranging points in the sector
-    uint16_t ofset;     //CN:扇区偏移量                  EN:sector offset
+    uint16_t N;         //CN:扇区内这个分包的测距点数 EN:The number of ranging points for this subpacket in the buffer
+    uint16_t whole_fan; //CN:缓冲区内总测距点数       EN:The total number of ranging points in the sector
+    uint16_t ofset;     //CN:扇区偏移量               EN:sector offset
     uint32_t beg_ang;   //CN:扇区起始角度             EN:Sector start angle
     uint32_t end_ang;   //CN:扇区终止角度             EN:Sector end angle
     uint32_t flags;     //CN:状态开关标识             EN:status switch flag
-    uint32_t timestamp; //CN:时间戳                        EN:timestamp        (other:The data timestamps of different sectors in a frame are consistent)
-    uint32_t dev_id;    //CN:设备号                        EN:device ID
+    uint32_t timestamp; //CN:时间戳                   EN:timestamp        (other:The data timestamps of different sectors in a frame are consistent)
+    uint32_t dev_id;    //CN:设备号                   EN:device ID
 };
 
 struct FanSegment_C7
 {
-    RawDataHdr7 hdr;            //CN：Hdr7结构体        EN：Hdr7structure 
+    RawDataHdr7 hdr;            //CN：Hdr7结构体      EN：Hdr7structure 
 
     uint16_t dist[MAX_POINTS];  //CN:距离             EN:distance
     uint16_t angle[MAX_POINTS]; //CN:角度             EN:angle
-    uint8_t energy[MAX_POINTS]; //CN:能量强度           EN:energy intensity
+    uint8_t energy[MAX_POINTS]; //CN:能量强度         EN:energy intensity
 
-    struct FanSegment_C7* next; // CN:下个扇区指针        EN:next sector pointer 
+    struct FanSegment_C7* next; // CN:下个扇区指针    EN:next sector pointer 
 };
 struct RawDataHdrAA {
     uint16_t code; // 0xFAAA
@@ -238,50 +240,49 @@ struct RawDataHdrAA {
 
 struct FanSegment_AA
 {
-    RawDataHdrAA hdr;           //CN：HdrAA结构体       EN：Hdr7structure
+    RawDataHdrAA hdr;           //CN：HdrAA结构体     EN：Hdr7structure
 
     uint16_t dist[MAX_POINTS];  //CN:距离             EN:distance
     uint16_t angle[MAX_POINTS]; //CN:角度             EN:angle
-    uint8_t energy[MAX_POINTS]; //CN:能量强度           EN:energy intensity
+    uint8_t energy[MAX_POINTS]; //CN:能量强度         EN:energy intensity
 
-    struct FanSegment_AA* next; // CN:下个扇区指针        EN:next sector pointer
+    struct FanSegment_AA* next; // CN:下个扇区指针    EN:next sector pointer
 };
 
 struct RawDataHdr99 {
-    uint16_t code;          //CN:帧头，固定为0x99FA           EN:Frame header, fixed at 0x99FA
+    uint16_t code;          //CN:帧头，固定为0x99FA         EN:Frame header, fixed at 0x99FA
     uint16_t N;             //CN:扇区内这个分包的测距点数   EN:The number of ranging points for this subpacket in the sector
-    uint16_t from;          //CN:扇区起始角度             EN:Sector start angle
+    uint16_t from;          //CN:扇区起始角度               EN:Sector start angle
     uint16_t total;         //CN:一整圈数据点个数           EN:The number of data points in a full circle
-    uint32_t flags;         //CN:状态开关标识             EN:status switch flag
-    uint32_t timestamp;     //CN:时间戳                        EN:timestamp 
+    uint32_t flags;         //CN:状态开关标识               EN:status switch flag
+    uint32_t timestamp;     //CN:时间戳                     EN:timestamp 
     uint32_t dev_no;        //CN:设备编号                   EN:device ID
-    uint32_t reserved[3];   //CN:保留位                        EN:reserved
+    uint32_t reserved[3];   //CN:保留位                     EN:reserved
 };
-
 
 //客户设置的雷达设备配置信息
 struct DevData
 {
-    int32_t RPM;//转速    范围0450-1200   例如：LSRPM:0450H
-    int32_t ERR;//偏差      范围-99-+99 例如:LSERR:-23H  LSERR:+23H
-    char UDP[64];//udp组合信息  设置雷达IP地址 子网掩码 网关 服务端口号，例如LSUDP:192.168.158.091 255.255.255.000 192.168.158.001 05000H
-    char DST[64];//接收雷达信息的ip地址和端口号  LSDST:192.168.158.043 12300H
-    char NSP[32];//机器类型    LSNSP:LDS-50C-S-UH
-    char UID[32];//机器序号     例如LSUID:201812030001H
-    int32_t FIR;//滤波圈数    (范围01~99) 例如：LSFIR:03H
-    int32_t PUL;//设置电机启动脉冲数   (范围0500~4000) 例如：LSPUL:2000H
-    int32_t VER;//设置版本号 例如：LSPUL:2000H
-    int32_t PNP;//设置IO类型  比如设置LSNPN:1H 输出IO类型为PNP
-    int32_t SMT;//数据平滑  LSSMT:1H  打开 LSSMT:0H  关闭
-    int32_t DSW;//去拖点  LSDSW:1H 打开 LSDSW:0H  关闭
-    int32_t DID;//设备ID   LSDID:xxxH
-    int32_t ATS;//开机自动上传  LSATS:xH    1/0   打开/关闭   
-    int32_t TFX;//固定上传地址  LSTFX:xH    1/0   打开/关闭   
+    int32_t RPM;    /// 转速    范围0450-1200   例如：LSRPM:0450H
+    int32_t ERR;    /// 偏差      范围-99-+99 例如:LSERR:-23H  LSERR:+23H
+    char UDP[64];   /// udp组合信息  设置雷达IP地址 子网掩码 网关 服务端口号，例如LSUDP:192.168.158.091 255.255.255.000 192.168.158.001 05000H
+    char DST[64];   /// 接收雷达信息的ip地址和端口号  LSDST:192.168.158.043 12300H
+    char NSP[32];   /// 机器类型    LSNSP:LDS-50C-S-UH
+    char UID[32];   /// 机器序号     例如LSUID:201812030001H
+    int32_t FIR;    /// 滤波圈数    (范围01~99) 例如：LSFIR:03H
+    int32_t PUL;    /// 设置电机启动脉冲数   (范围0500~4000) 例如：LSPUL:2000H
+    int32_t VER;    /// 设置版本号 例如：LSPUL:2000H
+    int32_t PNP;    /// 设置IO类型  比如设置LSNPN:1H 输出IO类型为PNP
+    int32_t SMT;    /// 数据平滑  LSSMT:1H  打开 LSSMT:0H  关闭
+    int32_t DSW;    /// 去拖点  LSDSW:1H 打开 LSDSW:0H  关闭
+    int32_t DID;    /// 设备ID   LSDID:xxxH
+    int32_t ATS;    /// 开机自动上传  LSATS:xH    1/0   打开/关闭   
+    int32_t TFX;    /// 固定上传地址  LSTFX:xH    1/0   打开/关闭   
     //另外
-    int32_t PST;//数据/报警上传类型  LSPST:xH    0:无 1:数据 2报警  3 数据+报警  
-    int32_t AF;//去拖点系数
-    char set[18];//需要设置的参数，1需要设置  0不设置  
-    char result[35];//设置是否成功  1成功   0失败
+    int32_t PST;    /// 数据/报警上传类型  LSPST:xH    0:无 1:数据 2报警  3 数据+报警  
+    int32_t AF;     /// 去拖点系数
+    char set[18];   /// 需要设置的参数，1需要设置  0不设置  
+    char result[35];/// 设置是否成功  1成功   0失败
 };
 
 struct  DevTimestamp

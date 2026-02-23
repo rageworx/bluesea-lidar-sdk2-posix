@@ -37,13 +37,14 @@ std::vector<DevConnInfo> LidarCheckService::getLidarsList()
 	uartDevInfo();
 	return m_infos;
 }
-void LidarCheckService::getTime_HMS(char* data)
+
+void LidarCheckService::getTime_HMS(char* data, size_t datalen)
 {
 	time_t t0 = time(NULL);
 	int hh = t0 % (3600 * 24) / 3600;
 	int mm = t0 % 3600 / 60;
 	int ss = t0 % 60;
-	sprintf(data, "%d-%d-%d", hh, mm, ss);
+	snprintf(data, datalen, "%d-%d-%d", hh, mm, ss);
 }
 
 void LidarCheckService::clear()
@@ -134,7 +135,7 @@ void* thread_heart(void* p)
 				strcpy(conn.conn_ip, inet_ntoa(addr.sin_addr));
 				conn.conn_port = ntohs(addr.sin_port);
 				memcpy(&conn.info.v101, dvi, sizeof(DevInfoV101));
-				LidarCheckService::getTime_HMS(conn.timeStr);
+				LidarCheckService::getTime_HMS(conn.timeStr, 16);
 				uptodate(conn);
 			}
 		}
@@ -151,7 +152,7 @@ void* thread_heart(void* p)
 
 				memcpy(&conn.info.v2, dvi, sizeof(DevInfo2));
 
-				LidarCheckService::getTime_HMS(conn.timeStr);
+				LidarCheckService::getTime_HMS(conn.timeStr,16);
 				uptodate(conn);
 			}
 		}
@@ -167,7 +168,7 @@ void* thread_heart(void* p)
 				strcpy(conn.conn_ip, inet_ntoa(addr.sin_addr));
 				conn.conn_port = ntohs(addr.sin_port);
 
-				LidarCheckService::getTime_HMS(conn.timeStr);
+				LidarCheckService::getTime_HMS(conn.timeStr,16);
 				uptodate(conn);
 			}
 		}

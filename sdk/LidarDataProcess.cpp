@@ -1140,12 +1140,14 @@ void *lidar_thread_proc_udp(void *param)
             default:
                 break;
         } /// of switch (cfg->action)
-        
-        msleep( 1 ); /// pthread yeilding ...
+#ifdef PTHREAD_NEED_YIELD
+        msleep( 0 );
+#endif /// of PTHREAD_NEED_YIELD
 	}
     
 	printf("%d\n", cfg->state);
 	SystemAPI::closefd(cfg->fd, true);
+    
     pthread_exit( NULL );
 	return NULL;
 }
@@ -1263,7 +1265,6 @@ bool readConfig(const char *cfg_file_name, RunScript &cfg)
 bool checkPointsLengthZero(UserData *tmp, float scale)
 {
 	size_t lengthZeroNum = 0;
-    pthread_mutex_lock( &tmp->framedata.datalock );
 	for (size_t i = 0; i < tmp->framedata.data.size(); i++)
 	{
 		if (tmp->framedata.data[i].distance == 0)
@@ -1271,8 +1272,7 @@ bool checkPointsLengthZero(UserData *tmp, float scale)
 			lengthZeroNum++;
 		}
 	}
-    pthread_mutex_unlock( &tmp->framedata.datalock );
-	// printf("lengthZeroNum:%d N:%d scale:%f\n", lengthZeroNum, tmp.N, tmp.N * scale);
+
 	if (tmp->framedata.data.size() * scale < lengthZeroNum)
 		return true;
     

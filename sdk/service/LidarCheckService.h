@@ -15,8 +15,10 @@ class LidarCheckService
         void stop();
         void clear();
         std::vector<DevConnInfo> getLidarsList();
-        static void getTime_HMS(char*data);
         void uartDevInfo();
+
+    public:
+        static void getTime_HMS(char*data, size_t datalen);
 
     private:
         pthread_t m_thread_heart;

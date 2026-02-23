@@ -304,48 +304,57 @@ static void thread_web(struct mg_connection *c, int ev, void *ev_data, void *fn_
             }
 			cJSON_AddItemToObject(root, "N", item);
 
+            FrameData *framedata = &runcfg->userdata.framedata;
+
             int tr = pthread_mutex_trylock( &runcfg->userdata.framedata.datalock );
             if ( tr != 0 )
             {
                 fprintf( stderr, 
-                         "pthread_mutex_trylock( &framedata->datalock ) failure (%d)\n",
+                         "310: pthread_mutex_trylock( &framedata->datalock ) failure (%d)\n",
                          tr );
                 fflush( stderr );
             }
             else
             {
+                item = cJSON_CreateNumber(runcfg->userdata.framedata.ts[0]);
+                cJSON_AddItemToObject(root, "timestamp_s", item);
+                item = cJSON_CreateNumber(runcfg->userdata.framedata.ts[1]);
+                cJSON_AddItemToObject(root, "timestamp_us", item);
                 pthread_mutex_unlock( &runcfg->userdata.framedata.datalock );
             }
-			item = cJSON_CreateNumber(runcfg->userdata.framedata.ts[0]);
-			cJSON_AddItemToObject(root, "timestamp_s", item);
-			item = cJSON_CreateNumber(runcfg->userdata.framedata.ts[1]);
-			cJSON_AddItemToObject(root, "timestamp_us", item);
-			FrameData *framedata = &runcfg->userdata.framedata;
             
-            printf( "(debug)framedata->data.size() = %zu\n", framedata->data.size() );
-            fflush( stdout );
-            pthread_mutex_lock( &framedata->datalock );
-			for (size_t i = 0; i < framedata->data.size(); i++)
-			{
-				point = cJSON_CreateObject();
-                if ( point != NULL )
+            tr = pthread_mutex_trylock( &framedata->datalock );
+            if ( tr != 0 )
+            {
+                fprintf( stderr, 
+                         "330: pthread_mutex_trylock( &framedata->datalock ) failure (%d)\n",
+                         tr );
+                fflush( stderr );                
+            }
+            else
+            {
+                for (size_t i = 0; i < framedata->data.size(); i++)
                 {
-                    item = cJSON_CreateNumber(framedata->data[i].angle * 180 / 3.1415926);
-                    cJSON_AddItemToObject(point, "angle", item);
-                    if ( item != NULL )
-                        item = cJSON_CreateNumber(framedata->data[i].distance);
-                    cJSON_AddItemToObject(point, "distance", item);
-                    if ( item != NULL )
-                        item = cJSON_CreateNumber(framedata->data[i].confidence);
-                    
-                    if ( item != NULL )
-                        cJSON_AddItemToObject(point, "confidence", item);
-                    
-                    if ( point != NULL && points != NULL )
-                        cJSON_AddItemToArray(points, point);
+                    point = cJSON_CreateObject();
+                    if ( point != NULL )
+                    {
+                        item = cJSON_CreateNumber(framedata->data[i].angle * 180.0/PI);
+                        cJSON_AddItemToObject(point, "angle", item);
+                        if ( item != NULL )
+                            item = cJSON_CreateNumber(framedata->data[i].distance);
+                        cJSON_AddItemToObject(point, "distance", item);
+                        if ( item != NULL )
+                            item = cJSON_CreateNumber(framedata->data[i].confidence);
+                        
+                        if ( item != NULL )
+                            cJSON_AddItemToObject(point, "confidence", item);
+                        
+                        if ( point != NULL && points != NULL )
+                            cJSON_AddItemToArray(points, point);
+                    }
                 }
-			}
-            pthread_mutex_unlock( &framedata->datalock );
+                pthread_mutex_unlock( &framedata->datalock );
+            }
 
 			cJSON_AddItemToObject(root, "data", points);
 			item = cJSON_CreateString("SUCCESS");
@@ -368,10 +377,10 @@ static void thread_web(struct mg_connection *c, int ev, void *ev_data, void *fn_
 			mg_http_reply(c, 200, "", "%s", out);
 			cJSON_Delete(root);
 			free(out);
-			msleep(15); /// 15 Hz
+			msleep(10); /// 1000/10 = 100Hz
             
-            printf( "(debug)mg_http_reply / done.\n" );
-            fflush( stdout );            
+            static size_t progress_q = 0;
+            printf( "\rProgress : %zu ...    ", progress_q ++ );
 		}
 		// 获取雷达设备信息
 		else if (mg_http_match_uri(hm, "/getDevinfo"))
