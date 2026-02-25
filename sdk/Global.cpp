@@ -204,14 +204,14 @@ int AlgorithmAPI::ShadowsFilter(UserData* scan_in, const ShadowsFilterParam& par
 }
 
 
-int AlgorithmAPI::MedianFilter(UserData* scan_in, const MedianFilterParam& param)
+int32_t AlgorithmAPI::MedianFilter(UserData* scan_in, \
+                                   const MedianFilterParam& param)
 {
-	int* dists = new int[scan_in->framedata.data.size()];
+    int32_t* dists = new int32_t[scan_in->framedata.data.size()];
+
+    if ( dists == NULL ) return -1;
     
-    if ( dists == NULL )
-        return -1;
-    
-	int* buf = new int[param.window * 2 + 1];
+	int32_t* buf = new int32_t[param.window * 2 + 1];
     
     if ( buf == NULL )
     {
@@ -231,7 +231,7 @@ int AlgorithmAPI::MedianFilter(UserData* scan_in, const MedianFilterParam& param
         {
             int n = 0;
             
-            for ( size_t j = -param.window; j <= param.window; j++ )
+            for ( int32_t j = -param.window; j <= param.window; j++ )
             {
                 if (dists[i + j] > 0) 
                 {
@@ -1609,8 +1609,7 @@ std::vector<std::string> SystemAPI::GetComPort()
                           "Hardware\\DeviceMap\\SerialComm", \
                           0, KEY_READ, &hKey) )
 	{
-		int i = 0;
-		int mm = 0;
+		size_t i = 0;
 		DWORD  dwLong, dwSize;
 		while (TRUE)
 		{
@@ -1992,7 +1991,9 @@ bool CommunicationAPI::vpc_talk(int hcom, int32_t mode, int16_t sn, \
 	char* buffer = new char[ sizeof(CmdHeader) + len ];
 
     if ( buffer == NULL )
+    {
         return false;
+    }
     
 	CmdHeader* hdr = (CmdHeader*)buffer;
 	hdr->sign = 0x484c;
@@ -2027,7 +2028,8 @@ bool CommunicationAPI::vpc_talk(int hcom, int32_t mode, int16_t sn, \
 			if (n > 0) nr += n;
 		}
 
-		for (size_t i = 0; i < (int)sizeof(buf) - nfetch; i++)
+        size_t imax = sizeof(buf) - (size_t)nfetch;
+		for (size_t i = 0; i<imax; i++)
 		{
 			if (mode == C_PACK)
 			{
@@ -2036,7 +2038,7 @@ bool CommunicationAPI::vpc_talk(int hcom, int32_t mode, int16_t sn, \
                     && buf[i + 2] == (signed char)0xBC 
                     && buf[i + 3] == (signed char)0xFF)
 				{
-					for (size_t j = 0; j < nfetch; j++)
+					for (size_t j = 0; j < (size_t)nfetch; j++)
 					{
 						if ((buf[i + j + 8] >= 33 && buf[i + j + 8] <= 127))
 						{
@@ -2081,8 +2083,7 @@ void CommunicationAPI::send_cmd_udp(int fd_udp, const char* dev_ip, \
 {
 	char* buffer = new char[ sizeof(CmdHeader) + len ];
     
-    if ( buffer == NULL )
-        return;
+    if ( buffer == NULL ) return;
     
 	CmdHeader* hdr = (CmdHeader*)buffer;
 	hdr->sign  = 0x484c;
@@ -2274,7 +2275,7 @@ bool CommunicationAPI::udp_talk_C_PACK(int fd_udp, const char* lidar_ip, \
 		}
 	}
 	
-    fprintf( stderr, "read %d packets, not response  \n", ntry );
+    fprintf( stderr, "read %zu packets, not response  \n", ntry );
 	return false;
 }
 
