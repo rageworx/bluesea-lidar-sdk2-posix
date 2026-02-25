@@ -383,7 +383,7 @@ bool BlueSeaLidarSDK::SetUDP(int ID, char *ip, char *mask, char *gateway, int po
 
 	char result[64] = {0};
 	// 对传入的格式校验
-	if (!BaseAPI::checkAndMerge(1, ip, mask, gateway, port, result))
+	if (!BaseAPI::checkAndMerge(1, ip, mask, gateway, port, result, 64))
 	{
 		return false;
 	}
@@ -411,8 +411,9 @@ bool BlueSeaLidarSDK::SetDST(int ID, char *ip, int port)
 		return false;
 
 	char result[50] = {0};
+    char noaddr[2] = "";
 	// 对传入的格式校验
-	if (!BaseAPI::checkAndMerge(0, ip, (char *)"", (char *)"", port, result))
+	if (!BaseAPI::checkAndMerge(0, ip, noaddr, noaddr, port, result, 50))
 	{
 		return false;
 	}

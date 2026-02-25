@@ -232,6 +232,7 @@ void *lidar_thread_proc_uart(void *param)
 	strcpy(cfg->userdata.connectArg1, cfg->runscript.connectArg);
 	cfg->userdata.connectArg2 = cfg->runscript.connectArg2;
 	FanSegment_AA **fan_segs = new FanSegment_AA *;
+    
 	*fan_segs = NULL;
 	std::vector<RawData> whole_datas;
 	int error_num = 0;
@@ -307,7 +308,10 @@ void *lidar_thread_proc_uart(void *param)
 			RawData dat;
 			if (data_bytes == 3)
 			{
-				is_pack = ParseAPI::parse_data_x(buf_len, buf, &uartstate, dat, consume, true, data_bytes, result, &cmdheader, (void **)fan_segs);
+				is_pack = ParseAPI::parse_data_x(buf_len, buf, &uartstate, dat, \
+                                                 consume, true, data_bytes, \
+                                                 result, 512, &cmdheader, \
+                                                 (void **)fan_segs);
 			}
 			else
 			{
@@ -939,7 +943,7 @@ void *lidar_thread_proc_udp(void *param)
 				RawData dat;
 				if (data_bytes == 3)
 				{
-					is_pack = ParseAPI::parse_data_x(buf_len, buf, &uartstate, dat, consume, true, data_bytes, result, &cmdheader, (void **)fan_segs);
+					is_pack = ParseAPI::parse_data_x(buf_len, buf, &uartstate, dat, consume, true, data_bytes, result, 512, &cmdheader, (void **)fan_segs);
 				}
 				else if (data_bytes == 2)
 				{

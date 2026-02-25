@@ -7,8 +7,8 @@ static WSADATA   wsda;
 static size_t sockInstance = 0;
 static FanSegment_C7* GetFanSegment(const RawDataHdr7& hdr, uint8_t* pdat, bool with_chk);
 static FanSegment_AA* GetFanSegment(const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk);
-static int GetFanPointCount(FanSegment_C7* seg);
-static int GetFanPointCount(FanSegment_AA* seg);
+static size_t GetFanPointCount(FanSegment_C7* seg);
+static size_t GetFanPointCount(FanSegment_AA* seg);
 static void PackFanData(FanSegment_C7* seg, RawData& rdat);
 static void PackFanData(FanSegment_AA* seg, RawData& rdat);
 
@@ -49,6 +49,34 @@ HANDLE getHandle( int idx )
 }
 
 #endif /// of _WIN32
+
+inline int32_t _write( int fd, const char* d, size_t l )
+{
+#ifdef _WIN32
+    // Windows need WriteFile() instead of _write().
+    DWORD  dWLen = (DWORD)l;
+    DWORD  dLen = 0;
+    HANDLE hHnd = getHandle( fd );
+    WriteFile( hHnd, d, dWLen, &dLen, NULL );
+    return (int32_t)dLen;
+#else
+    return write( fd, d, l );
+#endif
+}
+
+inline int32_t _read( int fd, char* d, size_t l )
+{
+#ifdef _WIN32
+    // Windows need WriteFile() instead of _write().
+    DWORD  dRLen = (DWORD)l;
+    DWORD  dLen = 0;
+    HANDLE hHnd = getHandle( fd );
+    ReadFile( hHnd, d, dRLen, &dLen, NULL );
+    return (int32_t)dLen;
+#else
+    return read( fd, d, l );
+#endif
+}
 
 inline double getAngleWithViewpoint(float r1, float r2, double included_angle)
 {
@@ -91,22 +119,23 @@ uint32_t stm32crc(uint32_t* ptr, uint32_t len)
 	return crc32;
 }
 
-std::string BaseAPI::stringfilter(char *str, int num)
+std::string BaseAPI::stringfilter( const char *str, size_t num )
 {
-    int index = 0;
-    for(int i=0;i<num;i++)
+    size_t index = 0;
+    for( size_t i=0; i<num; i++ )
     {
-       if((str[i]>=45&&str[i]<=58)||(str[i]>=65&&str[i]<=90)||(str[i]>=97&&str[i]<=122))
-       {
-          index++;
-       }
-       else
-       {
-           std::string arr = str;
-           arr=arr.substr(0,index);
-           return   arr;
-       }
+        if((str[i]>=45&&str[i]<=58)||(str[i]>=65&&str[i]<=90)||(str[i]>=97&&str[i]<=122))
+        {
+            index++;
+        }
+        else
+        {
+            std::string arr = str;
+            arr=arr.substr(0,index);
+            return   arr;
+        }
     }
+    
     return "";
 }
 
@@ -178,28 +207,45 @@ int AlgorithmAPI::ShadowsFilter(UserData* scan_in, const ShadowsFilterParam& par
 int AlgorithmAPI::MedianFilter(UserData* scan_in, const MedianFilterParam& param)
 {
 	int* dists = new int[scan_in->framedata.data.size()];
+    
+    if ( dists == NULL )
+        return -1;
+    
 	int* buf = new int[param.window * 2 + 1];
+    
+    if ( buf == NULL )
+    {
+        delete[] dists;
+        return -1;
+    }
 
-	for (size_t i = 0; i < scan_in->framedata.data.size(); i++)
+	for ( size_t i = 0; i < scan_in->framedata.data.size(); i++ )
+    {
 		dists[i] = scan_in->framedata.data[i].distance * 1000;
+    }
 
-	for (size_t i = param.window; i < scan_in->framedata.data.size() - param.window - 1; i++)
+	for ( size_t i = param.window; \
+          i < scan_in->framedata.data.size() - param.window - 1; i++ )
 	{
-		if (dists[i] == 0) continue;
+		if (dists[i] != 0)
+        {
+            int n = 0;
+            
+            for ( size_t j = -param.window; j <= param.window; j++ )
+            {
+                if (dists[i + j] > 0) 
+                {
+                    buf[n++] = dists[i + j];
+                }
+            }
 
-		int n = 0;
-		for (int j = -param.window; j <= param.window; j++)
-		{
-			if (dists[i + j] > 0) {
-				buf[n++] = dists[i + j];
-			}
-		}
-
-		if (n > 2)
-		{
-			qsort(buf, n, sizeof(int), int_cmper);
-			scan_in->framedata.data[i].distance = (float)(buf[param.window] / 1000.0);
-		}
+            if (n > 2)
+            {
+                qsort(buf, n, sizeof(int), int_cmper);
+                scan_in->framedata.data[i].distance = \
+                    (float)(buf[param.window] / 1000.0);
+            }
+        }
 	}
 
 	delete[] dists;
@@ -225,42 +271,53 @@ void DecTimestamp(uint32_t ts, uint32_t* ts2)
 	ts2[1] = (ts % 1000) * 1000;
 }
 
-static bool GetData0xC7(const RawDataHdr7& hdr, uint8_t* pdat, bool with_chk, RawData& dat,char *result, FanSegment_C7** last_fan_seg)
+static bool GetData0xC7(const RawDataHdr7& hdr, uint8_t* pdat, \
+                        bool with_chk, RawData& dat, \
+                        char *result, size_t result_len,
+                        FanSegment_C7** last_fan_seg )
 {
 	bool got = false;
 
 	FanSegment_C7* fan_seg = GetFanSegment(hdr, pdat, with_chk);
-	if (!fan_seg) {
-		return NULL;
-	}
+    
+	if ( fan_seg == NULL ) return NULL;
+
 	if (*last_fan_seg != NULL)
 	{
 		FanSegment_C7* seg = (*last_fan_seg);
 
 		if (seg->hdr.timestamp != fan_seg->hdr.timestamp)
 		{
-            //printf("drop old fan segments\n");
-            strcpy(result,"drop old fan segments");
-			while (seg) {
+            snprintf( result, result_len, "drop old fan segments" );
+            
+			while (seg) 
+            {
 				(*last_fan_seg) = seg->next;
 				delete seg;
 				seg = (*last_fan_seg);
 			}
+            
 			(*last_fan_seg) = fan_seg;
 		}
-		else {
-			while (seg) {
-				if (seg->hdr.ofset == fan_seg->hdr.ofset) {
-                    strcpy(result,"drop duplicated segment");
-                    //printf("drop duplicated segment\n");
+		else 
+        {
+			while (seg) 
+            {
+				if (seg->hdr.ofset == fan_seg->hdr.ofset) 
+                {
+                    snprintf( result, result_len, "drop duplicated segment" );
+
 					delete fan_seg;
 					fan_seg = NULL;
 					break;
 				}
-				if (seg->next == NULL) {
+                
+				if (seg->next == NULL) 
+                {
 					seg->next = fan_seg;
 					break;
 				}
+                
 				seg = seg->next;
 			}
 		}
@@ -271,7 +328,7 @@ static bool GetData0xC7(const RawDataHdr7& hdr, uint8_t* pdat, bool with_chk, Ra
 		*last_fan_seg = fan_seg;
 	}
 
-	uint32_t N = GetFanPointCount((*last_fan_seg));
+	size_t N = GetFanPointCount((*last_fan_seg));
 
 	if (N >= (*last_fan_seg)->hdr.whole_fan)
 	{
@@ -279,9 +336,8 @@ static bool GetData0xC7(const RawDataHdr7& hdr, uint8_t* pdat, bool with_chk, Ra
 		{
 			if (N > sizeof(dat.points) / sizeof(dat.points[0]))
 			{
-                //printf("too many %d points in 1 fan\n", N);
-                sprintf(result,"too many %d points in 1 fan",N);
-
+                snprintf( result, result_len,
+                          "too many %zu points in 1 fan", N );
 			}
 			else
 			{
@@ -292,50 +348,66 @@ static bool GetData0xC7(const RawDataHdr7& hdr, uint8_t* pdat, bool with_chk, Ra
 
 		// remove segments	
 		FanSegment_C7* seg = (*last_fan_seg);
-		while (seg) {
+		
+        while (seg) 
+        {
 			(*last_fan_seg) = seg->next;
 			delete seg;
 			seg = (*last_fan_seg);
 		}
 	}
+    
 	return got;
 }
-bool GetData0xAA(const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk, RawData& dat, char* result, FanSegment_AA** last_fan_seg)
+
+bool GetData0xAA( const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk, \
+                  RawData& dat, char* result, size_t result_len, \
+                  FanSegment_AA** last_fan_seg )
 {
 	bool got = false;
 
 	FanSegment_AA* fan_seg = GetFanSegment(hdr, pdat, with_chk);
-	if (!fan_seg) {
-		return false;
-	}
+
+	if ( fan_seg == NULL ) return false;
+
 	if (*last_fan_seg != NULL)
 	{
 		FanSegment_AA* seg = (*last_fan_seg);
 
 		if ((seg->hdr.second != fan_seg->hdr.second) && (seg->hdr.nano_sec != fan_seg->hdr.nano_sec))
 		{
-			//printf("drop old fan segments\n");
-			strcpy(result, "drop old fan segments");
-			while (seg) {
+			snprintf( result, result_len,
+                      "drop old fan segments" );
+                      
+			while (seg) 
+            {
 				(*last_fan_seg) = seg->next;
 				delete seg;
 				seg = (*last_fan_seg);
 			}
+            
 			(*last_fan_seg) = fan_seg;
 		}
-		else {
-			while (seg) {
-				if (seg->hdr.ofset == fan_seg->hdr.ofset) {
-					strcpy(result, "drop duplicated segment");
-					//printf("drop duplicated segment\n");
+		else 
+        {
+			while (seg) 
+            {
+				if (seg->hdr.ofset == fan_seg->hdr.ofset) 
+                {
+					snprintf( result, result_len, 
+                              "drop duplicated segment" );
+
 					delete fan_seg;
 					fan_seg = NULL;
 					break;
 				}
-				if (seg->next == NULL) {
+                
+				if ( seg->next == NULL ) 
+                {
 					seg->next = fan_seg;
 					break;
 				}
+                
 				seg = seg->next;
 			}
 		}
@@ -346,7 +418,7 @@ bool GetData0xAA(const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk, RawData&
 		*last_fan_seg = fan_seg;
 	}
 
-	uint32_t N = GetFanPointCount((*last_fan_seg));
+	size_t N = GetFanPointCount((*last_fan_seg));
 
 	if (N >= (*last_fan_seg)->hdr.whole_fan)
 	{
@@ -354,8 +426,8 @@ bool GetData0xAA(const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk, RawData&
 		{
 			if (N > sizeof(dat.points) / sizeof(dat.points[0]))
 			{
-				//printf("too many %d points in 1 fan\n", N);
-				sprintf(result, "too many %d points in 1 fan", N);
+				snprintf(result, result_len, \
+                         "too many %zu points in 1 fan", N);
 
 			}
 			else
@@ -367,7 +439,8 @@ bool GetData0xAA(const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk, RawData&
 
 		// remove segments
 		FanSegment_AA* seg = (*last_fan_seg);
-		while (seg) {
+		while (seg) 
+        {
 			(*last_fan_seg) = seg->next;
 			delete seg;
 			seg = (*last_fan_seg);
@@ -376,18 +449,19 @@ bool GetData0xAA(const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk, RawData&
 	return got;
 }
 
-bool GetData0xCE(const RawDataHdr& hdr, unsigned char* pdat, int span, int with_chk, RawData& dat,char*result)
+bool GetData0xCE( const RawDataHdr& hdr, uint8_t* pdat, int span, int with_chk,\
+                  RawData& dat, char*result, size_t result_len )
 {
 	// calc checksum
-	unsigned short sum = hdr.angle + hdr.N, chk;
-	for (int i = 0; i < hdr.N; i++)
+	uint16_t sum = hdr.angle + hdr.N, chk;
+	for (size_t i = 0; i < hdr.N; i++)
 	{
 		dat.points[i].confidence = *pdat++;
 		sum += dat.points[i].confidence;
 
-		unsigned short v = *pdat++;
-		unsigned short v2 = *pdat++;
-		unsigned short vv = (v2 << 8) | v;
+		uint16_t v = *pdat++;
+		uint16_t v2 = *pdat++;
+		uint16_t vv = (v2 << 8) | v;
 		dat.points[i].distance = vv / 1000.0;
 		sum += vv;
 		dat.points[i].angle = (hdr.angle + (double)span * i / hdr.N) * PI / 1800;
@@ -397,29 +471,29 @@ bool GetData0xCE(const RawDataHdr& hdr, unsigned char* pdat, int span, int with_
 
 	if (with_chk != 0 && chk != sum)
 	{
-        printf("chksum ce error");
-        strcpy(result,"chksum  error");
+        snprintf( result, result_len, "chksum  error" );
 		return false;
 	}
 
 	memcpy(&dat, &hdr, HDR_SIZE);
 	dat.span = span;
+    
 	return true;
 }
 
-bool GetData0x9D(const RawDataHdr2& hdr, unsigned char* pdat, int with_chk, RawData& dat,char*result)
+bool GetData0x9D(const RawDataHdr2& hdr, uint8_t* pdat, int32_t with_chk, \
+                 RawData& dat, char* result, size_t result_len )
 {
-	unsigned short sum = hdr.angle + hdr.N + hdr.span, chk;
+	uint16_t sum = hdr.angle + hdr.N + hdr.span, chk;
 
-	for (int i = 0; i < hdr.N; i++)
+	for (size_t i = 0; i < hdr.N; i++)
 	{
 		dat.points[i].confidence = 1;// *pdat++;
-		//sum += dat.points[i].confidence;
 
-		unsigned short v = *pdat++;
-		unsigned short v2 = *pdat++;
+		uint16_t v = *pdat++;
+		uint16_t v2 = *pdat++;
 
-		unsigned short vv = (v2 << 8) | v;
+		uint16_t vv = (v2 << 8) | v;
 
 		sum += vv;
 		dat.points[i].distance = vv / 1000.0;
@@ -430,8 +504,7 @@ bool GetData0x9D(const RawDataHdr2& hdr, unsigned char* pdat, int with_chk, RawD
 
 	if (with_chk != 0 && chk != sum)
 	{
-        printf("chksum cf error");
-        strcpy(result,"chksum  error");
+        snprintf( result, result_len, "chksum  error" );
 		return 0;
 	}
 
@@ -440,46 +513,44 @@ bool GetData0x9D(const RawDataHdr2& hdr, unsigned char* pdat, int with_chk, RawD
 
 }
 
-
-bool GetData0xCF(const RawDataHdr2& hdr, unsigned char* pdat, int with_chk, RawData& dat,char*result)
+bool GetData0xCF(const RawDataHdr2& hdr, uint8_t* pdat, int32_t with_chk, \
+                 RawData& dat, char*result, size_t result_len )
 {
-	unsigned short sum = hdr.angle + hdr.N + hdr.span, chk;
+	uint16_t sum = hdr.angle + hdr.N + hdr.span, chk;
 
-	for (int i = 0; i < hdr.N; i++)
+	for (size_t i = 0; i < hdr.N; i++)
 	{
 		dat.points[i].confidence = *pdat++;
 		sum += dat.points[i].confidence;
 
-		unsigned short v = *pdat++;
-		unsigned short v2 = *pdat++;
+		uint16_t v = *pdat++;
+		uint16_t v2 = *pdat++;
 
-		unsigned short vv = (v2 << 8) | v;
+		uint16_t vv = (v2 << 8) | v;
 
 		sum += vv;
 		dat.points[i].distance = vv / 1000.0;
-		dat.points[i].angle = (hdr.angle + hdr.span * i / (double)hdr.N) * PI / 1800;
+		dat.points[i].angle = (hdr.angle + hdr.span * i  \
+                               / (double)hdr.N) * PI / 1800;
 	}
 
 	memcpy(&chk, pdat, 2);
 
 	if (with_chk != 0 && chk != sum)
 	{
-        printf("chksum cf error");
-        strcpy(result,"chksum  error");
+        snprintf( result, result_len, "chksum  error" );
 		return 0;
 	}
 
 	memcpy(&dat, &hdr, sizeof(hdr));
-	//memcpy(dat.data, buf+idx+HDR_SIZE, 2*hdr.N);
-	//printf("get3 %d(%d)\n", hdr.angle, hdr.N);
 
 	return true;
-
 }
 
-bool GetData0xDF(const RawDataHdr3& hdr, unsigned char* pdat, int with_chk, RawData& dat,char*result)
+bool GetData0xDF(const RawDataHdr3& hdr, uint8_t* pdat, int with_chk, \
+                 RawData& dat, char*result, size_t result_len)
 {
-	unsigned short sum = hdr.angle + hdr.N + hdr.span, chk;
+	uint16_t sum = hdr.angle + hdr.N + hdr.span, chk;
 
 	sum += hdr.fbase;
 	sum += hdr.first;
@@ -488,14 +559,14 @@ bool GetData0xDF(const RawDataHdr3& hdr, unsigned char* pdat, int with_chk, RawD
 
 	double dan = (hdr.last - hdr.first) / double(hdr.N - 1);
 
-	for (int i = 0; i < hdr.N; i++)
+	for (size_t i = 0; i < hdr.N; i++)
 	{
 		dat.points[i].confidence = *pdat++;
 		sum += dat.points[i].confidence;
 
-		unsigned short v = *pdat++;
-		unsigned short v2 = *pdat++;
-		unsigned short vv = (v2 << 8) | v;
+		uint16_t v = *pdat++;
+		uint16_t v2 = *pdat++;
+		uint16_t vv = (v2 << 8) | v;
 		sum += vv;
 		dat.points[i].distance = vv / 1000.0;
 		dat.points[i].angle = (hdr.first + dan * i) * PI / 18000;
@@ -505,29 +576,23 @@ bool GetData0xDF(const RawDataHdr3& hdr, unsigned char* pdat, int with_chk, RawD
 
 	if (with_chk != 0 && chk != sum)
 	{
-        //printf("chksum df error");
-        strcpy(result,"chksum  error");
+        snprintf( result, result_len, "chksum  error" );
 		return 0;
 	}
 
 	memcpy(&dat, &hdr, HDR2_SIZE);
-	//memcpy(dat.data, buf+idx+HDR_SIZE, 2*hdr.N);
-	//printf("get3 %d(%d)\n", hdr.angle, hdr.N);
 
 	return true;
-
 }
 
-bool GetData0x99(const RawDataHdr99& hdr, unsigned char* pdat, int with_chk, RawData& dat,char*result)
+bool GetData0x99(const RawDataHdr99& hdr, uint8_t* pdat, int with_chk, \
+                 RawData& dat )
 {
 	dat.code = hdr.code;
 	dat.N = hdr.N;
-	dat.angle = hdr.from * 3600 / hdr.total; // 0.1 degree
-	dat.span = hdr.N * 3600 / hdr.total; // 0.1 degree
-	//dat.fbase = ;
-	//dat.first;
-	//dat.last;
-	//dat.fend;
+	dat.angle = hdr.from * 3600 / hdr.total;    /// 0.1 degree
+	dat.span = hdr.N * 3600 / hdr.total;        /// 0.1 degree
+
 	DecTimestamp(hdr.timestamp, dat.ts);
 
 	pdat += HDR99_SIZE;
@@ -535,7 +600,7 @@ bool GetData0x99(const RawDataHdr99& hdr, unsigned char* pdat, int with_chk, Raw
 	uint8_t* dist = pdat;
 	uint8_t* energy = pdat + 2 * hdr.N;
 
-	for (int i = 0; i < hdr.N; i++)
+	for (size_t i = 0; i < hdr.N; i++)
 	{
 		uint16_t lo = *dist++;
 		uint16_t hi = *dist++;
@@ -543,24 +608,30 @@ bool GetData0x99(const RawDataHdr99& hdr, unsigned char* pdat, int with_chk, Raw
 		dat.points[i].angle = ((i + hdr.from) * 360.0 / hdr.total) * PI / 180;
 		dat.points[i].confidence = energy[i];
 	}
+    
 	return true;
 }
 
-
-
-int ParseAPI::parse_data_x(uint32_t len, unsigned char* buf,UartState *uartstate, RawData& dat, int& consume, int with_chk,int &byte,char*result, CmdHeader *cmdheader,void** fan_segs)
+int32_t ParseAPI::parse_data_x( uint32_t len, uint8_t* buf, \
+                                UartState *uartstate, \
+                                RawData& dat, int32_t& consume, \
+                                int32_t with_chk, int32_t &byte, \
+                                char *result, size_t result_len, \
+                                CmdHeader *cmdheader, void** fan_segs )
 {
-	int span=180;
-	int pack_format=0xce;
+	uint32_t span=180;
+	uint8_t  pack_format = 0xce;
 	uint32_t idx = 0;
+    
+    // ??????
 	UNUSED(span);
 	UNUSED(pack_format);
 
     while (idx < len - 12)
 	{
-        //qDebug()<<hex<<buf[idx]<<buf[idx+1]<<(unsigned char)buf[idx+2]<<(unsigned char)buf[idx+3]<<endl;
         //LMSG
-        if (buf[idx] == 0x4c && buf[idx + 1] == 0x4d && (unsigned char)buf[idx + 2] == 0x53 && (unsigned char)buf[idx + 3] == 0x47)
+        if ( buf[idx] == 0x4c && buf[idx + 1] == 0x4d \
+             && (uint8_t)buf[idx + 2] == 0x53 && (uint8_t)buf[idx + 3] == 0x47)
 		{
 			LidarMsgHdr* hdr = (LidarMsgHdr*)(buf + idx);
             memcpy(result, hdr, sizeof(LidarMsgHdr));
@@ -568,9 +639,10 @@ int ParseAPI::parse_data_x(uint32_t len, unsigned char* buf,UartState *uartstate
 			return 2;
 		}
         //EPRM
-        else if (buf[idx] == 0x4c && buf[idx + 1] == 0x48 && (unsigned char)buf[idx + 2] == 0xac && (unsigned char)buf[idx + 3] == 0xb8)
+        else 
+        if (buf[idx] == 0x4c && buf[idx + 1] == 0x48 \
+            && (uint8_t)buf[idx + 2] == 0xac && (uint8_t)buf[idx + 3] == 0xb8)
         {
-
             memcpy(cmdheader, buf, sizeof(CmdHeader));
             EEpromV101*eepromv101 = (EEpromV101*)(buf + 8+idx);
             memcpy(result, eepromv101, sizeof(EEpromV101));
@@ -578,20 +650,26 @@ int ParseAPI::parse_data_x(uint32_t len, unsigned char* buf,UartState *uartstate
             return 3;
         }
         //时间同步返回的应答
-        else if (buf[idx] == 0x4c && buf[idx + 1] == 0x48 && (unsigned char)buf[idx + 2] == 0xbe && (unsigned char)buf[idx + 3] == 0xb4)
+        else 
+        if (buf[idx] == 0x4c && buf[idx + 1] == 0x48 \
+            && (uint8_t)buf[idx + 2] == 0xbe && (uint8_t)buf[idx + 3] == 0xb4)
 		{
             consume = idx + 2;
             return 4;
 		}
         //C_PACK
-        else if (buf[idx] == 0x4c && buf[idx + 1] == 0x48 && (unsigned char)buf[idx + 2] == 0xbc && (unsigned char)buf[idx + 3] == 0xff)
+        else
+        if (buf[idx] == 0x4c && buf[idx + 1] == 0x48 \
+            && (uint8_t)buf[idx + 2] == 0xbc && (uint8_t)buf[idx + 3] == 0xff)
         {
             consume = idx+2;
             memcpy(cmdheader, buf, sizeof(CmdHeader));
             return 5;
         }
         //S_PACK
-        else if (buf[idx] == 0x4c && buf[idx + 1] == 0x48 && (unsigned char)buf[idx + 2] == 0xac && (unsigned char)buf[idx + 3] == 0xff)
+        else 
+        if (buf[idx] == 0x4c && buf[idx + 1] == 0x48 \
+            && (uint8_t)buf[idx + 2] == 0xac && (uint8_t)buf[idx + 3] == 0xff)
         {
             consume = idx + 2;
             memcpy(cmdheader, buf, sizeof(CmdHeader));
@@ -599,31 +677,37 @@ int ParseAPI::parse_data_x(uint32_t len, unsigned char* buf,UartState *uartstate
             return 6;
         }
         //readzone
-        else if (buf[idx] == 0x4c && buf[idx + 1] == 0x48 && (unsigned char)buf[idx + 2] == 0xb8 && (unsigned char)buf[idx + 3] == 0xa5)
+        else
+        if (buf[idx] == 0x4c && buf[idx + 1] == 0x48 \
+            && (uint8_t)buf[idx + 2] == 0xb8 && (uint8_t)buf[idx + 3] == 0xa5)
         {
             consume = idx+4;
             memcpy(cmdheader, buf, sizeof(CmdHeader));
             return 7;
         }
         //writezone
-        else if (buf[idx] == 0x4c && buf[idx + 1] == 0x48 && (unsigned char)buf[idx + 2] == 0xac && (unsigned char)buf[idx + 3] == 0xa5)
+        else
+        if (buf[idx] == 0x4c && buf[idx + 1] == 0x48 \
+            && (uint8_t)buf[idx + 2] == 0xac && (uint8_t)buf[idx + 3] == 0xa5)
         {
             consume = idx + 4;
             memcpy(cmdheader, buf, sizeof(CmdHeader));
             return 8;
         }
 
-		if (buf[idx] == 'S' && buf[idx + 1] == 'T' && buf[idx + 6] == 'E' && buf[idx + 7] == 'D')
+		if (buf[idx] == 'S' && buf[idx + 1] == 'T' \
+            && buf[idx + 6] == 'E' && buf[idx + 7] == 'D')
 		{
-			unsigned char flag = buf[idx + 2];
-            uartstate->unit_mm=flag & 1;
-            uartstate->with_conf = flag & 2;
-            uartstate->with_smooth = flag & 4;
-            uartstate->with_fitter = flag & 8;
-            uartstate->span_9 = flag & 0x10;
-            uartstate->span_18 = flag & 0x20;
-            uartstate->span_other = flag & 0x40;
-            uartstate->resampele = flag & 0x80;
+			uint8_t flag = buf[idx + 2];
+            
+            uartstate->unit_mm      = flag & 1;
+            uartstate->with_conf    = flag & 2;
+            uartstate->with_smooth  = flag & 4;
+            uartstate->with_fitter  = flag & 8;
+            uartstate->span_9       = flag & 0x10;
+            uartstate->span_18      = flag & 0x20;
+            uartstate->span_other   = flag & 0x40;
+            uartstate->resampele    = flag & 0x80;
 			
             if(flag & 0x10)
                 span = 180;
@@ -638,7 +722,9 @@ int ParseAPI::parse_data_x(uint32_t len, unsigned char* buf,UartState *uartstate
             return 9;
 		}
 
-		if (buf[idx + 1] == 0xfa && (buf[idx] == 0xdf || buf[idx] == 0xce || buf[idx] == 0xcf || buf[idx] == 0xc7 || buf[idx] == 0x9d || buf[idx] == 0x99 || buf[idx] == 0xaa))
+		if (buf[idx + 1] == 0xfa && (buf[idx] == 0xdf || buf[idx] == 0xce \
+            || buf[idx] == 0xcf || buf[idx] == 0xc7 || buf[idx] == 0x9d \
+            || buf[idx] == 0x99 || buf[idx] == 0xaa))
 		{
 			// found;
 			pack_format = buf[idx];
@@ -651,26 +737,30 @@ int ParseAPI::parse_data_x(uint32_t len, unsigned char* buf,UartState *uartstate
 
 		RawDataHdr hdr;
 		memcpy(&hdr, buf + idx, HDR_SIZE);
-		if (buf[idx] == 0x99) {
+		if (buf[idx] == 0x99) 
+        {
 			RawDataHdr99 hdr99;
 			memcpy(&hdr99, buf + idx, HDR99_SIZE);
 			if (hdr99.total == 0)
 			{
-				printf("bad num hdr99 \n");
+				fprintf( stderr, "bad num hdr99 \n" );
 				idx += 2;
 				continue;
 			}
 			int hdr99_span = hdr99.N * 3600 / hdr99.total;
 			if (hdr99_span % 90 != 0)
 			{
-				printf("bad angle %d \n", hdr99_span);
+				fprintf( stderr, "bad angle %d \n", hdr99_span );
 				idx += 2;
 				continue;
 			}
 		}
-		else if (buf[idx] != 0xc7&& buf[idx] != 0xaa) {
-			if (hdr.angle % 90 != 0) {
-				printf("bad angle %d \n", hdr.angle);
+		else 
+        if (buf[idx] != 0xc7&& buf[idx] != 0xaa) 
+        {
+			if (hdr.angle % 90 != 0) 
+            {
+				fprintf( stderr, "bad angle %d \n", hdr.angle );
 				idx += 2;
 				continue;
 			}
@@ -678,72 +768,86 @@ int ParseAPI::parse_data_x(uint32_t len, unsigned char* buf,UartState *uartstate
 
         if (hdr.N > MAX_POINTS)
 		{
-			printf("points number %d seem not correct\n", hdr.N);
+			fprintf( stderr, "points number %d seem not correct\n", hdr.N );
 			idx += 2;
 			continue;
 		}
 
-		bool got;
+		bool got = false;
+        
 		if (buf[idx] == 0xce && idx + HDR_SIZE + hdr.N * 3 + 2 <= len)
 		{
 			got = GetData0xCE(hdr, buf + idx + HDR_SIZE,
 				hdr.angle == 3420 ? span * 2 : span,
-                with_chk, dat,result);
+                with_chk, dat,result, result_len);
 			consume = idx + HDR_SIZE + 3 * hdr.N + 2;
 		}
-		else if (buf[idx] == 0x9d && idx + hdr.N * 2 + 10 <= len)
+		else 
+        if (buf[idx] == 0x9d && idx + hdr.N * 2 + 10 <= len)
 		{
 			RawDataHdr2 hdr2;
 			memcpy(&hdr2, buf + idx, HDR2_SIZE);
-            got = GetData0x9D(hdr2, buf + idx + HDR2_SIZE, with_chk, dat,result);
+            got = GetData0x9D(hdr2, buf + idx + HDR2_SIZE, with_chk, dat,\
+                              result,result_len);
 			consume = idx + HDR2_SIZE + 2 * hdr.N + 2;
 		}
-		else if (buf[idx] == 0xdf && idx + hdr.N * 3 + 18 <= len)
+		else 
+        if (buf[idx] == 0xdf && idx + hdr.N * 3 + 18 <= len)
 		{
 			RawDataHdr3 hdr3;
 			memcpy(&hdr3, buf + idx, HDR3_SIZE);
-            got = GetData0xDF(hdr3, buf + idx + HDR3_SIZE, with_chk, dat,result);
+            got = GetData0xDF(hdr3, buf + idx + HDR3_SIZE, with_chk, dat, \
+                              result,result_len);
 			consume = idx + HDR3_SIZE + 3 * hdr.N + 2;
 		}
-		else if (buf[idx] == 0xcf && idx + HDR2_SIZE + hdr.N * 3 + 2 <= len)
+		else 
+        if (buf[idx] == 0xcf && idx + HDR2_SIZE + hdr.N * 3 + 2 <= len)
 		{
 			RawDataHdr2 hdr2;
 			memcpy(&hdr2, buf + idx, HDR2_SIZE);
-            got = GetData0xCF(hdr2, buf + idx + HDR2_SIZE, with_chk, dat,result);
+            got = GetData0xCF(hdr2, buf + idx + HDR2_SIZE, with_chk, dat,\
+                              result,result_len);
 			consume = idx + HDR2_SIZE + 3 * hdr.N + 2;
 		}
-		else if (buf[idx] == 0xc7 && idx + HDR7_SIZE + hdr.N * 5 + 2 <= len)
+		else 
+        if (buf[idx] == 0xc7 && idx + HDR7_SIZE + hdr.N * 5 + 2 <= len)
 		{
 			RawDataHdr7 hdr7;
 			memcpy(&hdr7, buf + idx, HDR7_SIZE);
 
-            got = GetData0xC7(hdr7, buf + idx, with_chk, dat, result,(FanSegment_C7**)fan_segs);
+            got = GetData0xC7(hdr7, buf + idx, with_chk, dat, \
+                              result, result_len, (FanSegment_C7**)fan_segs);
 
 			consume = idx + HDR7_SIZE + 5 * hdr.N + 2;
 		}
-		else if (buf[idx] == 0x99 && idx + HDR99_SIZE + hdr.N * 3 + 2 <= len)
+		else 
+        if (buf[idx] == 0x99 && idx + HDR99_SIZE + hdr.N * 3 + 2 <= len)
 		{
 			RawDataHdr99 hdr99;
 			memcpy(&hdr99, buf + idx, HDR99_SIZE);
 
-            got = GetData0x99(hdr99, buf + idx, with_chk, dat,result);
+            got = GetData0x99(hdr99, buf + idx, with_chk, dat );
 
 			consume = idx + HDR99_SIZE + 3 * hdr.N + 2;
 		}
-		else if (buf[idx] == 0xaa && idx + HDRAA_SIZE + hdr.N * 3 + 2 <= len)
+		else 
+        if (buf[idx] == 0xaa && idx + HDRAA_SIZE + hdr.N * 3 + 2 <= len)
 		{
 			RawDataHdrAA hdraa;
 			memcpy(&hdraa, buf + idx, HDRAA_SIZE);
 
-			got = GetData0xAA(hdraa, buf + idx, with_chk, dat, result, (FanSegment_AA**)fan_segs);
+			got = GetData0xAA(hdraa, buf + idx, with_chk, dat, \
+                              result, result_len, (FanSegment_AA**)fan_segs);
 
 			consume = idx + HDRAA_SIZE + 3 * hdr.N + 2;
 		}
-		else {
+		else 
+        {
 			// data packet not complete
 			break;
 		}
-		return got;
+        
+		return (int32_t)got;
 	}
 
 	if (idx > 1024) consume = idx / 2;
@@ -751,7 +855,7 @@ int ParseAPI::parse_data_x(uint32_t len, unsigned char* buf,UartState *uartstate
     return -1;
 }
 
-int ParseAPI::parse_data(uint32_t len, unsigned char* buf,UartState *uartstate,RawData& dat, int& consume, int with_chk)
+int ParseAPI::parse_data(uint32_t len, uint8_t* buf,UartState *uartstate,RawData& dat, int& consume, int with_chk)
 {
 	uint32_t idx = 0;
 	int pack_format = 0xce;
@@ -762,7 +866,7 @@ int ParseAPI::parse_data(uint32_t len, unsigned char* buf,UartState *uartstate,R
 	{
 		if (buf[idx] == 'S' && buf[idx + 1] == 'T' && buf[idx + 6] == 'E' && buf[idx + 7] == 'D')
 		{
-            unsigned char flag = buf[idx + 2];
+            uint8_t flag = buf[idx + 2];
             uartstate->unit_mm=flag & 1;
             uartstate->with_conf = flag & 2;
             uartstate->with_smooth = flag & 4;
@@ -810,13 +914,13 @@ int ParseAPI::parse_data(uint32_t len, unsigned char* buf,UartState *uartstate,R
 		}
 
 		// calc checksum
-		unsigned short sum = hdr.angle + hdr.N, chk;
-		unsigned char* pdat = buf + idx + HDR_SIZE;
+		uint16_t sum = hdr.angle + hdr.N, chk;
+		uint8_t* pdat = buf + idx + HDR_SIZE;
 		for (int i = 0; i < hdr.N; i++)
 		{
-			unsigned short v = *pdat++;
-			unsigned short v2 = *pdat++;
-			unsigned short val = (v2 << 8) | v;
+			uint16_t v = *pdat++;
+			uint16_t v2 = *pdat++;
+			uint16_t val = (v2 << 8) | v;
 
             if (uartstate->with_conf)
 			{
@@ -885,13 +989,15 @@ int UserAPI::whole_data_process(const RawData& raw,int collect_angle, std::vecto
 	}
     if (angles != 3600)
     {
-        sprintf(tmp,"angle sum %d, drop %d fans %d points",angles, n, count);
+        snprintf(tmp, 128, \
+                 "angle sum %d, drop %d fans %d points",angles, n, count);
         error = tmp;
         whole_datas.clear();
         return -1;
     }
     return 1;
 }
+
 bool judgepcIPAddrIsValid(const char* pcIPAddr)
 {
 	int iDots = 0; /* 字符.的个数 */
@@ -947,35 +1053,46 @@ bool judgepcIPAddrIsValid(const char* pcIPAddr)
 
 	return false;
 }
-bool BaseAPI::checkAndMerge(int type, char* ip, char* mask, char* gateway, int port, char* result)
+bool BaseAPI::checkAndMerge( uint32_t type, const char* ip, const char* mask, \
+                             const char* gateway, uint16_t port, \
+                             char* result, size_t result_len )
 {
 	std::string s = ip;
+
 	int a[4] = { 0 };
-	for (int i = 0; i < 4; i++)
+
+	for ( size_t i = 0; i < 4; i++ )
 	{
-		int tmp = s.find('.', 0);
+		size_t tmp = s.find('.', 0);
 		std::string str = s.substr(0, tmp);
 		a[i] = atoi(str.c_str());
 		s = s.substr(tmp + 1);
 		if (a[0] < 10)
 			return false;
 	}
+    
 	if (!judgepcIPAddrIsValid(ip))
 		return false;
-	if (port <= 1000 || port > 65535)
+    
+	if (port <= 1000)
 		return false;
+    
 	if (type == 0)
 	{
-		sprintf(result, "%03d.%03d.%03d.%03d %05d", a[0], a[1], a[2], a[3], port);
+		snprintf( result, result_len, \
+                  "%03d.%03d.%03d.%03d %05u", \
+                  a[0], a[1], a[2], a[3], port );
 		return true;
 	}
 	else
 	{
 		if (!judgepcIPAddrIsValid(mask) || !judgepcIPAddrIsValid(gateway))
 			return false;
-		int b[4] = { 0 };
+        
+		int32_t b[4] = { 0 };
 		s = mask;
-		for (int i = 0; i < 4; i++)
+        
+		for (size_t i = 0; i < 4; i++)
 		{
 			int tmp = s.find('.', 0);
 			std::string str = s.substr(0, tmp);
@@ -984,9 +1101,11 @@ bool BaseAPI::checkAndMerge(int type, char* ip, char* mask, char* gateway, int p
 			if (b[0] == 0)
 				return false;
 		}
-		int c[4] = { 0 };
+        
+		int32_t c[4] = { 0 };
 		s = gateway;
-		for (int i = 0; i < 4; i++)
+        
+		for (size_t i = 0; i < 4; i++)
 		{
 			int tmp = s.find('.', 0);
 			std::string str = s.substr(0, tmp);
@@ -1018,21 +1137,23 @@ bool BaseAPI::checkAndMerge(int type, char* ip, char* mask, char* gateway, int p
 			return false;
 
 
-		sprintf(result, "%03d.%03d.%03d.%03d %03d.%03d.%03d.%03d %03d.%03d.%03d.%03d %05d",
-			a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3], c[0], c[1], c[2], c[3], port);
+		snprintf( result, result_len,
+                  "%03d.%03d.%03d.%03d %03d.%03d.%03d.%03d "
+                  "%03d.%03d.%03d.%03d %05u",
+			      a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3], 
+                  c[0], c[1], c[2], c[3], port );
 		return true;
 	}
 }
 
-int find(std::vector<RawData>a, int n, int x)
+int32_t find(std::vector<RawData>a, size_t n, int32_t x)
 {
-    int i;
-    int min = abs(a.at(0).angle - x);
-    int r = 0;
+    int32_t min = abs(a[0].angle - x);
+    int32_t r = 0;
 
-    for (i = 0; i < n; ++i)
+    for (size_t i = 0; i < n; ++i)
     {
-        if (abs(a.at(i).angle - x) < min)
+        if (abs(a[i].angle - x) < min)
         {
             min = abs(a.at(i).angle - x);
             r = i;
@@ -1061,8 +1182,7 @@ int UserAPI::autoGetFirstAngle(const RawData &raw, bool from_zero, std::vector<R
             }
             if (angles != 3600)
             {
-
-                sprintf(tmp_error,"angle sum %d\n", angles);
+                snprintf(tmp_error, 128, "angle sum %d\n", angles);
                 error = tmp_error;
                 raws.clear();
                 return -2;
@@ -1097,15 +1217,15 @@ bool uart_talk(int fd, int n, const char* cmd,
 	int nfetch, char* fetch)
 {
 	printf("send command : %s\n", cmd);
-	write(fd, cmd, n);
+	_write(fd, cmd, n);
 
 	char buf[2048] = {0};
     
-	int nr = read(fd, buf, sizeof(buf));
+	int nr = _read(fd, buf, sizeof(buf));
     
 	while (nr < (int)sizeof(buf))
 	{
-		int n = read(fd, buf + nr, sizeof(buf) - nr);
+		int n = _read(fd, buf + nr, sizeof(buf) - nr);
 		if (n > 0)
 			nr += n;
 	}
@@ -1172,17 +1292,17 @@ bool vpc_talk(int hcom, int mode, short sn, int len, const char* cmd, int nfetch
 	//pcrc[0] = BaseAPI::stm32crc((uint32_t*)(buffer + 0), len / 4 + 2);
 
 	int len2 = len + sizeof(CmdHeader) + 4;
-	int nr = write(hcom, buffer, len2);
+	int nr = _write(hcom, buffer, len2);
 	char buf[2048];
 	int index = 10;
 	//4C 48 BC FF   xx xx xx xx  result
 	//读取之后的10*2048个长度，如果不存在即判定失败
 	while (index--)
 	{
-		nr = read(hcom, buf, sizeof(buf));
+		nr = _read(hcom, buf, sizeof(buf));
 		while (nr < (int)sizeof(buf))
 		{
-			int n = read(hcom, buf + nr, sizeof(buf) - nr);
+			int n = _read(hcom, buf + nr, sizeof(buf) - nr);
 			if (n > 0) nr += n;
 		}
 
@@ -1218,7 +1338,7 @@ bool vpc_talk(int hcom, int mode, short sn, int len, const char* cmd, int nfetch
 				{
 					//printf("%02x  %02x\n", buf[i + 2], buf[i + 3]);
 					//随机码判定
-					short packSN = ((unsigned char)buf[i + 5] << 8) | (unsigned char)buf[i + 4];
+					short packSN = ((uint8_t)buf[i + 5] << 8) | (uint8_t)buf[i + 4];
 					if (packSN != sn)
 						continue;
 
@@ -1232,9 +1352,11 @@ bool vpc_talk(int hcom, int mode, short sn, int len, const char* cmd, int nfetch
 	return false;
 }
 
-void send_cmd_vpc(int hCom, int mode, int sn, int len, const char* cmd)
+void send_cmd_vpc( int hCom, int32_t mode, int32_t sn, int32_t len, \
+                   const char* cmd )
 {
 	char buffer[2048] = { 0 };
+    
 	CmdHeader* hdr = (CmdHeader*)buffer;
 	hdr->sign = 0x484c;
 	hdr->cmd = mode;
@@ -1249,7 +1371,7 @@ void send_cmd_vpc(int hCom, int mode, int sn, int len, const char* cmd)
 	//pcrc[0] =BaseAPI::stm32crc((uint32_t*)(buffer + 0), len / 4 + 2);
 
 	int len2 = len + sizeof(CmdHeader) + 4;
-	write(hCom, buffer, len2);
+	_write(hCom, buffer, len2);
 }
 
 #ifdef _WIN32
@@ -1313,7 +1435,7 @@ int SystemAPI::GetComList(std::vector<UARTARG>& list)
 	return 0;
 }
 
-int GetDevInfoByUART(const char* port_str, int speed)
+int32_t GetDevInfoByUART(const char* port_str, uint32_t speed)
 {
 	int zeroNum = 0;
 	uint32_t check_size = 4096;
@@ -1323,13 +1445,13 @@ int GetDevInfoByUART(const char* port_str, int speed)
 	}
 
 	char cmd[] = "LUUIDH";
-	write(hPort, cmd, sizeof(cmd));
+	_write(hPort, cmd, sizeof(cmd));
 	int bOK = false;
-	unsigned char* buf = new unsigned char[check_size];
+	uint8_t* buf = new uint8_t[check_size];
 	unsigned long  rf = 0;
 	while (rf < check_size)
 	{
-		int  tmp = read(hPort, buf + rf, check_size - rf);
+		int  tmp = _read(hPort, buf + rf, check_size - rf);
 		if (tmp > 0)
 		{
 			rf += tmp;
@@ -1366,7 +1488,7 @@ int GetDevInfoByUART(const char* port_str, int speed)
 	return bOK;
 }
 
-int GetDevInfoByVPC(const char* port_str, int speed)
+int32_t GetDevInfoByVPC(const char* port_str, uint32_t speed)
 {
 	int zeroNum = 0;
 	unsigned long  rf = 0;
@@ -1380,11 +1502,11 @@ int GetDevInfoByVPC(const char* port_str, int speed)
 	char cmd[] = "LUUIDH";
 	CommunicationAPI::send_cmd_vpc((int)hPort, 0x0043, rand(), sizeof(cmd), cmd);
 	int bOK = false;
-	unsigned char* buf = new unsigned char[check_size];
+	uint8_t* buf = new uint8_t[check_size];
 	//遍历返回的信息中是否含有MCU VERSION:
 	while (rf < check_size)
 	{
-		int  tmp = read(hPort, buf + rf, check_size - rf);
+		int  tmp = _read(hPort, buf + rf, check_size - rf);
 		if (tmp > 0)
 		{
 			rf += tmp;
@@ -1421,12 +1543,12 @@ int GetDevInfoByVPC(const char* port_str, int speed)
 	return bOK;
 }
 
-int SystemAPI::open_serial_port(const char* name, int speed)
+int32_t SystemAPI::open_serial_port(const char* name, uint32_t speed)
 {
 	return Open_serial_port(name, speed);
 }
 
-int SystemAPI::open_socket_port(int localhost)
+int32_t SystemAPI::open_socket_port(int32_t localhost)
 {
     initSocket();
     
@@ -1451,7 +1573,7 @@ int SystemAPI::open_socket_port(int localhost)
 	return fd_udp;
 }
 
-int SystemAPI::closefd(int __fd, bool isSocket)
+int32_t SystemAPI::closefd(int __fd, bool isSocket)
 {
 #ifdef _WIN32
 	if (!isSocket)
@@ -1544,7 +1666,7 @@ std::vector<std::string> SystemAPI::GetComPort()
 }
 
 #ifdef _WIN32
-int Open_serial_port(const char* name, int port)
+int32_t Open_serial_port(const char* name, uint16_t port)
 {
 	char path[32] = {0};
 	snprintf(path, 32, "\\\\.\\%s", name);
@@ -1616,8 +1738,6 @@ int Open_serial_port(const char* name, int port)
 	// on the port.
 	if (!SetCommTimeouts(hPort, &CommTimeouts))
 	{
-		// Could not set the timeout parameters.
-		// MessageBox(0, "Unable to set the timeout parameters", "error", MB_OK);
 		CloseHandle(hPort);
 		return 0;
 	}
@@ -1625,7 +1745,7 @@ int Open_serial_port(const char* name, int port)
 	return putHandle( hPort );
 }
 #elif __linux
-int Open_serial_port(const char* port, int baud_rate)
+int32_t Open_serial_port(const char* port, uint32_t baud_rate)
 {
 	int fd = open(port, O_RDWR | O_NOCTTY | O_NDELAY);
 	if (fd < 0)
@@ -1648,7 +1768,6 @@ int Open_serial_port(const char* port, int baud_rate)
 
 	/* set speed */
 	int speed = B230400;
-	// if (baudrate == 115200) speed = B115200;
 
 	ret = cfsetispeed(&attrs, speed);  //[baudrate]);
 	ret |= cfsetospeed(&attrs, speed); //[baudrate]);
@@ -1717,56 +1836,70 @@ int Open_serial_port(const char* port, int baud_rate)
 }
 #endif // _WIN32
 
-void CommunicationAPI::send_cmd_vpc(int hCom, int mode, int sn, int len, const char* cmd)
+void CommunicationAPI::send_cmd_vpc(int32_t hCom, uint32_t mode, uint32_t sn, \
+                                    uint32_t len, const char* cmd)
 {
-	char buffer[2048] = { 0 };
-	CmdHeader* hdr = (CmdHeader*)buffer;
-	hdr->sign = 0x484c;
-	hdr->cmd = mode;
-	hdr->sn = sn;
-	len = ((len + 3) >> 2) * 4;
+	char* buffer = new char[ sizeof( CmdHeader ) + len ];
+    
+    if ( buffer != NULL )
+    {    
+        CmdHeader* hdr = (CmdHeader*)buffer;
+        
+        hdr->sign = 0x484c;
+        hdr->cmd  = mode;
+        hdr->sn   = sn;
+        len       = ((len + 3) >> 2) * 4;
 
-	hdr->len = len;
-	memcpy(buffer + sizeof(CmdHeader), cmd, len);
-	uint32_t* pcrc = (uint32_t*)(buffer + sizeof(CmdHeader) + len);
+        hdr->len = len;
+        if ( len > 0 )
+        {
+            memcpy(buffer + sizeof(CmdHeader), cmd, len);
+            uint32_t* pcrc = (uint32_t*)(buffer + sizeof(CmdHeader) + len);
 
-	pcrc[0] = stm32crc((uint32_t*)(buffer + 0), len / 4 + 2);
-	//pcrc[0] =BaseAPI::stm32crc((uint32_t*)(buffer + 0), len / 4 + 2);
+            pcrc[0] = stm32crc((uint32_t*)(buffer + 0), len / 4 + 2);
 
-	int len2 = len + sizeof(CmdHeader) + 4;
-	write(hCom, buffer, len2);
+            int len2 = len + sizeof(CmdHeader) + 4;
+            _write( hCom, buffer, len2 );
+        }
+        
+        delete[] buffer;
+    }
 }
 
-bool CommunicationAPI::uart_talk(int fd, int n, const char* cmd, int nhdr, const char* hdr_str, int nfetch, char* fetch,int waittime)
+bool CommunicationAPI::uart_talk(int fd, size_t n, const char* cmd, \
+                                 int32_t nhdr, const char* hdr_str, \
+                                 int32_t nfetch, char* fetch, \
+                                 uint64_t retrycount)
 {
+#ifdef DEBUG
 	printf("send command : %s\n", cmd);
-    write(fd, cmd, n);
+#endif /// of DEBUG
 
-    char buf[4096];
-    int nr =  read(fd, buf, sizeof(buf));
-    int idx=waittime;
-    while (nr < (int)sizeof(buf))
+    _write(fd, cmd, n);
+
+    char buf[4096] = {0};
+    int32_t  nr  = _read(fd, buf, sizeof(buf));
+    uint64_t idx = retrycount;
+    while (nr < (int32_t)sizeof(buf))
     {
-        int n =  read(fd, buf + nr, sizeof(buf) - nr);
-        //printf(" fd %d %d \n",n,nr);
+        int n =  _read(fd, buf + nr, sizeof(buf) - nr);
+
         if (n > 0)
         {
             nr += n;
-            idx=waittime;
+            idx = retrycount;
         }
-        else if(n==0)
+        else 
+        if (n == 0)
         {
             idx--;
             msleep(1);
-            if(idx==0)
+            if( idx == 0 )
             {
-                //printf("read 0 byte max index break\n");
                 break;
             }
         }
     }
-    // if(idx>0)
-    //     printf("read max byte break\n");
 
     for (size_t i = 0; i <sizeof(buf) - nhdr - nfetch; i++)
     {
@@ -1774,14 +1907,26 @@ bool CommunicationAPI::uart_talk(int fd, int n, const char* cmd, int nhdr, const
         {
             if (nfetch > 0)
             {
-                if (strcmp(cmd, "LXVERH") == 0 || strcmp(cmd, "LUUIDH") == 0 || strcmp(cmd, "LTYPEH") == 0|| strcmp(cmd, "LQAZNH") == 0
-                        || strcmp(cmd, "LQPSTH") == 0|| strcmp(cmd, "LQNPNH") == 0|| strcmp(cmd, "LQOUTH") == 0|| strcmp(cmd, "LQCIRH") == 0|| strcmp(cmd, "LQFIRH") == 0
-                        || strcmp(cmd, "LQSRPMH") == 0||strcmp(cmd, "LQSMTH") == 0||strcmp(cmd, "LQDSWH") == 0||strcmp(cmd, "LQZTPH") == 0||strcmp(cmd, "LQSAFH") == 0)
+                if (strcmp(cmd, "LXVERH") == 0 \
+                    || strcmp(cmd, "LUUIDH") == 0 \
+                    || strcmp(cmd, "LTYPEH") == 0 \
+                    || strcmp(cmd, "LQAZNH") == 0 \
+                    || strcmp(cmd, "LQPSTH") == 0 \
+                    || strcmp(cmd, "LQNPNH") == 0 \
+                    || strcmp(cmd, "LQOUTH") == 0 \
+                    || strcmp(cmd, "LQCIRH") == 0 \
+                    || strcmp(cmd, "LQFIRH") == 0 \
+                    || strcmp(cmd, "LQSRPMH") == 0 \
+                    || strcmp(cmd, "LQSMTH") == 0 \
+                    || strcmp(cmd, "LQDSWH") == 0 \
+                    || strcmp(cmd, "LQZTPH") == 0 \
+                    || strcmp(cmd, "LQSAFH") == 0 )
                 {
                     memcpy(fetch, buf + i + nhdr, nfetch);
                     fetch[nfetch] = 0;
                 }
-                else if(strstr(cmd, "LSRPM")!=NULL)
+                else 
+                if(strstr(cmd, "LSRPM")!=NULL)
                 {
                     if(buf[i + nhdr+1]=='O'&&buf[i + nhdr+2]=='K')
                     {
@@ -1800,6 +1945,7 @@ bool CommunicationAPI::uart_talk(int fd, int n, const char* cmd, int nhdr, const
                     fetch[3] = 0;
                 }
             }
+            
             return true;
         }
         else if (memcmp(buf + i, cmd, n) == 0)
@@ -1814,27 +1960,40 @@ bool CommunicationAPI::uart_talk(int fd, int n, const char* cmd, int nhdr, const
                 }
                 fetch[2] = 0;
             }
+            
             return true;
         }
-        else if (memcmp(buf + i, "unsupport", 9) == 0)
+        else 
+        if (memcmp(buf + i, "unsupport", 9) == 0)
         {
             if (nfetch > 0)
             {
                 strcpy(fetch, "unsupport");
                 fetch[10] = 0;
             }
+            
             return true;
         }
     }
 
-    printf("read %d bytes, not found %s\n", nr, hdr_str);
+    fprintf( stderr, "read %d bytes, not found %s\n", nr, hdr_str);
+    
     return false;
 }
 
-bool CommunicationAPI::vpc_talk(int hcom, int mode, short sn, int len, const char* cmd, int nfetch, void* result)
+bool CommunicationAPI::vpc_talk(int hcom, int32_t mode, int16_t sn, \
+                                size_t len, const char* cmd, int32_t nfetch, \
+                                void* result)
 {
+#ifdef DEBUG
 	printf("USB send command : %s\n", cmd);
-	char buffer[2048];
+#endif /// of DEBUG
+
+	char* buffer = new char[ sizeof(CmdHeader) + len ];
+
+    if ( buffer == NULL )
+        return false;
+    
 	CmdHeader* hdr = (CmdHeader*)buffer;
 	hdr->sign = 0x484c;
 	hdr->cmd = mode;
@@ -1846,36 +2005,38 @@ bool CommunicationAPI::vpc_talk(int hcom, int mode, short sn, int len, const cha
 	memcpy(buffer + sizeof(CmdHeader), cmd, len);
 
 	uint32_t* pcrc = (uint32_t*)(buffer + sizeof(CmdHeader) + len);
+    
 	pcrc[0] = stm32crc((uint32_t*)(buffer + 0), len / 4 + 2);
-	//pcrc[0] = BaseAPI::stm32crc((uint32_t*)(buffer + 0), len / 4 + 2);
 
-	int len2 = len + sizeof(CmdHeader) + 4;
-	int nr = write(hcom, buffer, len2);
-	char buf[2048];
-	int index = 10;
+	size_t len2 = len + sizeof(CmdHeader) + 4;
+	int32_t nr = _write(hcom, buffer, len2);
+    
+    delete[] buffer;
+    
+    // what "buf" for ?? read ?
+	char   buf[2048] = {0};
+	size_t index = 10;
 	//4C 48 BC FF   xx xx xx xx  result
 	//读取之后的10*2048个长度，如果不存在即判定失败
 	while (index--)
 	{
-		nr = read(hcom, buf, sizeof(buf));
+		nr = _read(hcom, buf, sizeof(buf));
 		while (nr < (int)sizeof(buf))
 		{
-			int n = read(hcom, buf + nr, sizeof(buf) - nr);
+			int n = _read(hcom, buf + nr, sizeof(buf) - nr);
 			if (n > 0) nr += n;
 		}
 
-		for (int i = 0; i < (int)sizeof(buf) - nfetch; i++)
+		for (size_t i = 0; i < (int)sizeof(buf) - nfetch; i++)
 		{
 			if (mode == C_PACK)
 			{
 				char* fetch = (char*)result;
-				if (buf[i] == 0x4C && buf[i + 1] == 0x48 && buf[i + 2] == (signed char)0xBC && buf[i + 3] == (signed char)0xFF)
+				if (buf[i] == 0x4C && buf[i + 1] == 0x48 \
+                    && buf[i + 2] == (signed char)0xBC 
+                    && buf[i + 3] == (signed char)0xFF)
 				{
-					/*int packSN = ((uint32_t)buf[i + 5] << 8) | (uint32_t)buf[i + 4];
-					if (packSN != sn)
-						continue;*/
-
-					for (int j = 0; j < nfetch; j++)
+					for (size_t j = 0; j < nfetch; j++)
 					{
 						if ((buf[i + j + 8] >= 33 && buf[i + j + 8] <= 127))
 						{
@@ -1892,11 +2053,13 @@ bool CommunicationAPI::vpc_talk(int hcom, int mode, short sn, int len, const cha
 			}
 			else if (mode == S_PACK)
 			{
-				if ((buf[i + 2] == (signed char)0xAC && buf[i + 3] == (signed char)0xB8) || (buf[i + 2] == (signed char)0xAC && buf[i + 3] == (signed char)0xff))
+				if ((buf[i + 2] == (signed char)0xAC && buf[i + 3] \
+                                == (signed char)0xB8) \
+                    || (buf[i + 2] == (signed char)0xAC && buf[i + 3] \
+                                   == (signed char)0xff))
 				{
-					//printf("%02x  %02x\n", buf[i + 2], buf[i + 3]);
 					//随机码判定
-					short packSN = ((unsigned char)buf[i + 5] << 8) | (unsigned char)buf[i + 4];
+					short packSN = ((uint8_t)buf[i + 5] << 8) | (uint8_t)buf[i + 4];
 					if (packSN != sn)
 						continue;
 
@@ -1906,17 +2069,25 @@ bool CommunicationAPI::vpc_talk(int hcom, int mode, short sn, int len, const cha
 			}
 		}
 	}
-	printf("read %d bytes, not found %s\n", nr, cmd);
+    
+	fprintf( stderr, "read %d bytes, not found %s\n", nr, cmd );
 	return false;
 }
 
-void  CommunicationAPI::send_cmd_udp(int fd_udp, const char* dev_ip, int dev_port, int cmd, int sn, int len, const void* snd_buf)
+void CommunicationAPI::send_cmd_udp(int fd_udp, const char* dev_ip, \
+                                    uint16_t dev_port, int32_t cmd, \
+                                    int32_t sn, size_t len, \
+                                    const void* snd_buf)
 {
-	char buffer[2048];
+	char* buffer = new char[ sizeof(CmdHeader) + len ];
+    
+    if ( buffer == NULL )
+        return;
+    
 	CmdHeader* hdr = (CmdHeader*)buffer;
-	hdr->sign = 0x484c;
-	hdr->cmd = cmd;
-	hdr->sn = sn;
+	hdr->sign  = 0x484c;
+	hdr->cmd   = cmd;
+	hdr->sn    = sn;
 
 	len = ((len + 3) >> 2) * 4;
 
@@ -1937,9 +2108,12 @@ void  CommunicationAPI::send_cmd_udp(int fd_udp, const char* dev_ip, int dev_por
 	sendto(fd_udp, buffer, len2, 0, (struct sockaddr*)&to, sizeof(struct sockaddr));
 }
 
-bool CommunicationAPI::udp_talk_GS_PACK(int fd_udp, const char* ip, int port, int n, const char* cmd, void* result)
+bool CommunicationAPI::udp_talk_GS_PACK(int fd_udp, const char* ip, \
+                                        uint16_t port, size_t n, \
+                                        const char* cmd, void* result)
 {
-	unsigned short sn = rand();
+	uint16_t sn = rand()%0xFFFF;
+    
 	CommunicationAPI::send_cmd_udp(fd_udp, ip, port, 0x4753, sn, n, cmd);
 
 	int nr = 0;
@@ -1986,9 +2160,11 @@ bool CommunicationAPI::udp_talk_GS_PACK(int fd_udp, const char* ip, int port, in
 }
 
 //配置信息设置
-bool CommunicationAPI::udp_talk_S_PACK(int fd_udp, const char* ip, int port, int n, const char* cmd, void* result)
+bool CommunicationAPI::udp_talk_S_PACK(int fd_udp, const char* ip, \
+                                       uint16_t port, size_t n, \
+                                       const char* cmd, void* result)
 {
-	unsigned short sn = rand();
+	uint16_t sn = rand();
 	CommunicationAPI::send_cmd_udp(fd_udp, ip, port, 0x0053, sn, n, cmd);
 
 	int nr = 0;
@@ -2016,30 +2192,37 @@ bool CommunicationAPI::udp_talk_S_PACK(int fd_udp, const char* ip, int port, int
 			if (nr > 0)
 			{
 				CmdHeader* hdr = (CmdHeader*)buf;
+                
 				if (hdr->sign != 0x484c || hdr->sn != sn)
 					continue;
+                
 				memcpy(result, buf + 8, 2);
+                
 				return true;
 			}
 		}
 	}
 
-	printf("read %d packets, not response\n", nr);
+	fprintf( stderr, "read %d packets, not response\n", nr );
 	return false;
 }
 
-bool CommunicationAPI::udp_talk_C_PACK(int fd_udp, const char* lidar_ip, int lidar_port,
-	int n, const char* cmd,
-	int nhdr, const char* hdr_str,
-	int nfetch, char* fetch)
+bool CommunicationAPI::udp_talk_C_PACK(int fd_udp, const char* lidar_ip, \
+                                       uint16_t lidar_port,
+                                       size_t n, const char* cmd,
+                                       int32_t nhdr, const char* hdr_str,
+                                       int32_t nfetch, char* fetch)
 {
+#ifdef DEBUG
 	printf("send command : \'%s\' \n", cmd);
+#endif /// of DEBUG
 
-	unsigned short sn = rand();
+	uint16_t sn = rand() % 0xFFFF;
 	CommunicationAPI::send_cmd_udp(fd_udp, lidar_ip, lidar_port, 0x0043, sn, n, cmd);
 
 	time_t t0 = time(NULL);
-	int ntry = 0;
+	size_t ntry = 0;
+    
 	while (time(NULL) < t0 + 3 && ntry < 1000)
 	{
 		fd_set fds;
@@ -2051,7 +2234,7 @@ bool CommunicationAPI::udp_talk_C_PACK(int fd_udp, const char* lidar_ip, int lid
 
 		if (ret < 0)
 		{
-			printf("select error\n");
+			fprintf( stderr, "select error\n" );
 			return false;
 		}
 		if (ret == 0)
@@ -2090,37 +2273,42 @@ bool CommunicationAPI::udp_talk_C_PACK(int fd_udp, const char* lidar_ip, int lid
 			}
 		}
 	}
-	printf("read %d packets, not response  \n", ntry);
+	
+    fprintf( stderr, "read %d packets, not response  \n", ntry );
 	return false;
 }
 
 static FanSegment_C7* GetFanSegment(const RawDataHdr7& hdr, uint8_t* pdat, bool with_chk)
 {
 	UNUSED(with_chk);
+    
 	FanSegment_C7* fan_seg = new FanSegment_C7;
-	if (!fan_seg) {
+
+	if (!fan_seg) 
+    {
 		printf("out of memory\n");
 		return NULL;
 	}
+    
 	fan_seg->hdr = hdr;
 	fan_seg->next = NULL;
 
 	uint16_t sum = 0;
-	//if (with_chk)
-	{
-		uint16_t* pchk = (uint16_t*)pdat;
-		for (int i = 1; i < HDR7_SIZE / 2; i++)
-			sum += pchk[i];
-	}
 
-	uint8_t* pDist = pdat + HDR7_SIZE;
+    uint16_t* pchk = (uint16_t*)pdat;
+    for (size_t i = 1; i < HDR7_SIZE / 2; i++)
+    {
+        sum += pchk[i];
+    }
+
+	uint8_t* pDist  = pdat + HDR7_SIZE;
 	uint8_t* pAngle = pdat + HDR7_SIZE + 2 * hdr.N;
 	uint8_t* energy = pdat + HDR7_SIZE + 4 * hdr.N;
 
-	for (int i = 0; i < hdr.N; i++, pDist += 2, pAngle += 2)
+	for (size_t i = 0; i < hdr.N; i++, pDist += 2, pAngle += 2)
 	{
-		fan_seg->dist[i] = ((uint16_t)(pDist[1]) << 8) | pDist[0];
-		fan_seg->angle[i] = ((uint16_t)(pAngle[1]) << 8) | pAngle[0];
+		fan_seg->dist[i]   = ((uint16_t)(pDist[1]) << 8) | pDist[0];
+		fan_seg->angle[i]  = ((uint16_t)(pAngle[1]) << 8) | pAngle[0];
 		fan_seg->energy[i] = energy[i];
 
 		sum += fan_seg->dist[i];
@@ -2128,10 +2316,12 @@ static FanSegment_C7* GetFanSegment(const RawDataHdr7& hdr, uint8_t* pdat, bool 
 		sum += energy[i];
 	}
 
-	uint8_t* pchk = pdat + HDR7_SIZE + 5 * hdr.N;
-	uint16_t chksum = ((uint16_t)(pchk[1]) << 8) | pchk[0];
-	if (chksum != sum) {
-		printf("checksum error\n");
+	uint8_t* pchk8   = pdat + HDR7_SIZE + 5 * hdr.N;
+	uint16_t chksum = ((uint16_t)(pchk8[1]) << 8) | pchk8[0];
+    
+	if (chksum != sum) 
+    {
+		fprintf(stderr, "checksum error\n");
 		delete fan_seg;
 		return NULL;
 	}
@@ -2142,30 +2332,32 @@ static FanSegment_C7* GetFanSegment(const RawDataHdr7& hdr, uint8_t* pdat, bool 
 static FanSegment_AA* GetFanSegment(const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk)
 {
 	UNUSED(with_chk);
+    
 	FanSegment_AA* fan_seg = new FanSegment_AA;
-	if (!fan_seg) {
-		printf("out of memory\n");
+	if ( fan_seg == NULL ) 
+    {
+		fprintf(stderr,"memory allocation failure\n");
 		return NULL;
 	}
 	fan_seg->hdr = hdr;
 	fan_seg->next = NULL;
 
 	uint16_t sum = 0;
-	//if (with_chk)
-	{
-		uint16_t* pchk = (uint16_t*)pdat;
-		for (int i = 1; i < (HDRAA_SIZE) / 2; i++)
-			sum += pchk[i];
-	}
+    uint16_t* pchk = (uint16_t*)pdat;
 
-	uint8_t* pDist = pdat + HDRAA_SIZE;
+    for (size_t i = 1; i < (HDRAA_SIZE) / 2; i++)
+    {
+        sum += pchk[i];
+    }
+
+	uint8_t* pDist  = pdat + HDRAA_SIZE;
 	uint8_t* pAngle = pdat + HDRAA_SIZE + 2 * hdr.N;
 	uint8_t* energy = pdat + HDRAA_SIZE + 4 * hdr.N;
 
-	for (int i = 0; i < hdr.N; i++, pDist += 2, pAngle += 2)
+	for (size_t i = 0; i < hdr.N; i++, pDist += 2, pAngle += 2)
 	{
-		fan_seg->dist[i] = ((uint16_t)(pDist[1]) << 8) | pDist[0];
-		fan_seg->angle[i] = ((uint16_t)(pAngle[1]) << 8) | pAngle[0];
+		fan_seg->dist[i]   = ((uint16_t)(pDist[1]) << 8) | pDist[0];
+		fan_seg->angle[i]  = ((uint16_t)(pAngle[1]) << 8) | pAngle[0];
 		fan_seg->energy[i] = energy[i];
 
 		sum += fan_seg->dist[i];
@@ -2173,10 +2365,12 @@ static FanSegment_AA* GetFanSegment(const RawDataHdrAA& hdr, uint8_t* pdat, bool
 		sum += energy[i];
 	}
 
-	uint8_t* pchk = pdat + HDRAA_SIZE + 5 * hdr.N;
-	uint16_t chksum = ((uint16_t)(pchk[1]) << 8) | pchk[0];
-	if (chksum != sum) {
-		printf("checksum error\n");
+	uint8_t* pchk8   = pdat + HDRAA_SIZE + 5 * hdr.N;
+	uint16_t chksum = ((uint16_t)(pchk8[1]) << 8) | pchk8[0];
+    
+	if (chksum != sum) 
+    {
+		fprintf(stderr, "checksum error\n");
 		delete fan_seg;
 		return NULL;
 	}
@@ -2184,20 +2378,28 @@ static FanSegment_AA* GetFanSegment(const RawDataHdrAA& hdr, uint8_t* pdat, bool
 	return fan_seg;
 }
 
-static int GetFanPointCount(FanSegment_C7* seg)
+static size_t GetFanPointCount(FanSegment_C7* seg)
 {
-	int n = 0;
+	size_t n = 0;
 
-	while (seg) { n += seg->hdr.N;  seg = seg->next; }
+	while (seg) 
+    { 
+        n += seg->hdr.N;
+        seg = seg->next; 
+    }
 
 	return n;
 }
 
-static int GetFanPointCount(FanSegment_AA* seg)
+static size_t GetFanPointCount(FanSegment_AA* seg)
 {
-	int n = 0;
+	size_t n = 0;
 
-	while (seg) { n += seg->hdr.N;  seg = seg->next; }
+	while (seg) 
+    { 
+        n += seg->hdr.N;
+        seg = seg->next; 
+    }
 
 	return n;
 }
@@ -2206,23 +2408,25 @@ static void PackFanData(FanSegment_C7* seg, RawData& rdat)
 {
 	RawData* dat = &rdat;
 
-	dat->code = 0xfac7;
-	dat->N = seg->hdr.whole_fan;
-	dat->angle = seg->hdr.beg_ang / 100; // 0.1 degree
-	dat->span = (seg->hdr.end_ang - seg->hdr.beg_ang) / 100; // 0.1 degree
-	dat->fbase = 0;
-	dat->first = 0;
-	dat->last = 0;
-	dat->fend = 0;
-	dat->flags = seg->hdr.flags;
+	dat->code   = 0xfac7;
+	dat->N      = seg->hdr.whole_fan;
+	dat->angle  = seg->hdr.beg_ang / 100; // 0.1 degree
+	dat->span   = (seg->hdr.end_ang - seg->hdr.beg_ang) / 100; // 0.1 degree
+	dat->fbase  = 0;
+	dat->first  = 0;
+	dat->last   = 0;
+	dat->fend   = 0;
+	dat->flags  = seg->hdr.flags;
 
 	DecTimestamp(seg->hdr.timestamp, dat->ts);
 
-	int count = 0;
-	while (seg)
+	size_t count = 0;
+    
+	while(seg)
 	{
 		double s = PI / 180000.0;
-		for (int i = 0; i < seg->hdr.N; i++, count++)
+        
+		for (size_t i = 0; i < seg->hdr.N; i++, count++)
 		{
 			dat->points[count].confidence = seg->energy[i];
 			dat->points[count].distance = seg->dist[i] / 1000.0;
@@ -2231,31 +2435,31 @@ static void PackFanData(FanSegment_C7* seg, RawData& rdat)
 
 		seg = seg->next;
 	}
-	//return dat;
 }
 
 static void PackFanData(FanSegment_AA* seg, RawData& rdat)
 {
 	RawData* dat = &rdat;
 
-	dat->code = 0xfaaa;
-	dat->N = seg->hdr.whole_fan;
-	dat->angle = seg->hdr.beg_ang / 100; // 0.1 degree
-	dat->span = (seg->hdr.end_ang - seg->hdr.beg_ang) / 100; // 0.1 degree
-	dat->fbase = 0;
-	dat->first = 0;
-	dat->last = 0;
-	dat->fend = 0;
-	dat->flags = seg->hdr.flags;
+	dat->code   = 0xfaaa;
+	dat->N      = seg->hdr.whole_fan;
+	dat->angle  = seg->hdr.beg_ang / 100; // 0.1 degree
+	dat->span   = (seg->hdr.end_ang - seg->hdr.beg_ang) / 100; // 0.1 degree
+	dat->fbase  = 0;
+	dat->first  = 0;
+	dat->last   = 0;
+	dat->fend   = 0;
+	dat->flags  = seg->hdr.flags;
+	dat->ts[0]  = seg->hdr.second;
+	dat->ts[1]  = seg->hdr.nano_sec / 1000;
 
-	dat->ts[0] = seg->hdr.second;
-	dat->ts[1] = seg->hdr.nano_sec / 1000;
-
-	int count = 0;
-	while (seg)
+	size_t count = 0;
+    
+	while(seg)
 	{
 		double s = PI / 180000.0;
-		for (int i = 0; i < seg->hdr.N; i++, count++)
+        
+		for (size_t i = 0; i < seg->hdr.N; i++, count++)
 		{
 			dat->points[count].confidence = seg->energy[i];
 			dat->points[count].distance = seg->dist[i] / 1000.0;
@@ -2264,32 +2468,35 @@ static void PackFanData(FanSegment_AA* seg, RawData& rdat)
 
 		seg = seg->next;
 	}
-	//return dat;
 }
 
-bool checkWindowValid2(std::vector<DataPoint> scan, size_t idx, size_t window, double max_distance,double angle_increment)
+bool checkWindowValid2(std::vector<DataPoint> scan, size_t idx, size_t window, \
+                       double max_distance, double angle_increment)
 {
-    uint32_t num_neighbors = 0;
-    const float r1 = scan.at(idx).distance; // 当前点云的距离数据
-    float r2 = 0.;                      // 范围内点云的数据
+    size_t num_neighbors = 0;
+    const float r1 = scan.at(idx).distance; /// 当前点云的距离数据
+    float r2 = 0.;                          /// 范围内点云的数据
+
     // Look around the current point until either the window is exceeded
     // or the number of neighbors was found.
-    for (int y = -window; y < (int)window + 1 && num_neighbors < window; y++)
+    for (int32_t y = (int32_t)-window; y < (int32_t)window + 1  \
+         && num_neighbors < window; y++)
     {
-        int j = idx + y;
+        int32_t j = idx + y;
         
         if (j < 0 || j >= (int)scan.size()||(int)idx == j)
         {
             continue;
         }
         
-        r2 = scan.at(j).distance; 
+        r2 = scan[j].distance; 
         
         if(r2==0)
             continue;
         
         // delete the re in the result
-        const float d = sqrt(pow(r1, 2) + pow(r2, 2) -(2 * r1 * r2 * cosf(y * angle_increment)));
+        const float d = sqrt(pow(r1, 2) + pow(r2, 2) \
+                             - (2 * r1 * r2 * cosf(y * angle_increment)));
 
         if (d <= max_distance)
         {
@@ -2297,7 +2504,6 @@ bool checkWindowValid2(std::vector<DataPoint> scan, size_t idx, size_t window, d
         }
     }
     
-    //printf("%s %d\n", __FUNCTION__, __LINE__);
     // consider the window to be the number of neighbors we need
     if (num_neighbors < window)
     {
@@ -2307,13 +2513,19 @@ bool checkWindowValid2(std::vector<DataPoint> scan, size_t idx, size_t window, d
     return true; // effective
 }
 
-bool AlgorithmAPI::filter(std::vector<DataPoint>  &output_scan, double max_range, double min_range, double max_range_difference, int filter_window,double angle_increment)
+bool AlgorithmAPI::filter(std::vector<DataPoint> &output_scan, \
+                          double max_range, double min_range, \
+                          double max_range_difference, \
+                          size_t filter_window, double angle_increment)
 {
     std::vector<bool> valid_ranges;
+    
     /*Check if range size is big enough to use7 the filter window */
     if (output_scan.size() <= (size_t)filter_window + 1)
     {
-        printf("Scan ranges size is too small: size = %ld", output_scan.size());
+        fprintf( stderr, 
+                 "Scan ranges size is too small: size = %zu", 
+                 output_scan.size());
         return false;
     }
 
@@ -2322,18 +2534,21 @@ bool AlgorithmAPI::filter(std::vector<DataPoint>  &output_scan, double max_range
     valid_ranges.clear();
     while (i < i_max)
     {
-        bool out_of_range = ((output_scan.at(i).distance > max_range) || (output_scan.at(i).distance < min_range));
-        // ROS_INFO("%lf", min_range);
+        bool out_of_range = ((output_scan[i].distance > max_range) \
+                             || (output_scan.at(i).distance < min_range));
         valid_ranges.push_back(out_of_range);
-        ++i;
+        i++;
     }
 
     i = 0;
     i_max = output_scan.size() - filter_window + 1;
+    
     while (i < i_max)
     {
-        bool window_valid = checkWindowValid2(output_scan, i, filter_window, max_range_difference,angle_increment);
-        if (window_valid)
+        bool window_valid = checkWindowValid2(output_scan, i, filter_window, \
+                                              max_range_difference, \
+                                              angle_increment);
+        if ( window_valid == true )
         {
             size_t j = i, j_max = i + filter_window;
             
@@ -2342,22 +2557,22 @@ bool AlgorithmAPI::filter(std::vector<DataPoint>  &output_scan, double max_range
                 valid_ranges[j++] = true;
             } while (j < j_max);
         }
-        ++i;
+        i++;
     }
     
     i = 0;
     i_max = valid_ranges.size();
-    int errnum=0;
+    size_t errcnt = 0;
     while (i < i_max)
     {
         if (!valid_ranges[i])
         {
             output_scan[i].distance = 0;
-            errnum++;
+            errcnt++;
         }
-        ++i;
+        i++;
     }
-    //printf("%ld not valid num:%d\n",i,errnum);
+
     return true;
 }
 
