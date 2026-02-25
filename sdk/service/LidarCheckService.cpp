@@ -41,10 +41,10 @@ std::vector<DevConnInfo> LidarCheckService::getLidarsList()
 void LidarCheckService::getTime_HMS(char* data, size_t datalen)
 {
 	time_t t0 = time(NULL);
-	int hh = t0 % (3600 * 24) / 3600;
-	int mm = t0 % 3600 / 60;
-	int ss = t0 % 60;
-	snprintf(data, datalen, "%d-%d-%d", hh, mm, ss);
+	uint32_t hh = t0 % (3600 * 24) / 3600;
+	uint32_t mm = t0 % 3600 / 60;
+	uint32_t ss = t0 % 60;
+	snprintf(data, datalen, "%u-%u-%u", hh, mm, ss);
 }
 
 void LidarCheckService::clear()
@@ -52,12 +52,11 @@ void LidarCheckService::clear()
 	m_infos.clear();
 }
 
-
 void LidarCheckService::uartDevInfo()
 {
 	std::vector<UARTARG>list;
 	SystemAPI::GetComList(list);
-	for (unsigned int i = 0; i < list.size(); i++)
+	for (size_t i = 0; i < list.size(); i++)
 	{
 		DevConnInfo tmp;
 		memset(&tmp, 0, sizeof(DevConnInfo));
@@ -75,13 +74,14 @@ void uptodate(DevConnInfo data)
 		m_infos.push_back(data);
 		return ;
 	}
-	for (unsigned i = 0; i < m_infos.size(); i++)
+    
+	for (size_t i = 0; i < m_infos.size(); i++)
 	{
 		//如果是同一个雷达则覆盖
-		if ((data.type == TYPE_COM && strcmp(data.com_port,m_infos.at(i).com_port)==0)
-			|| (data.type != TYPE_COM && strcmp(data.conn_ip, m_infos.at(i).conn_ip) == 0))
+		if ((data.type == TYPE_COM && strcmp(data.com_port,m_infos[i].com_port)==0)
+			|| (data.type != TYPE_COM && strcmp(data.conn_ip, m_infos[i].conn_ip) == 0))
 		{
-			memcpy(&m_infos.at(i), &data, sizeof(DevConnInfo));
+			memcpy(&m_infos[i], &data, sizeof(DevConnInfo));
 			return;
 		}
 	}
@@ -101,9 +101,9 @@ void* thread_heart(void* p)
 		return NULL;
 	}
 
-	sockaddr_in addr;
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(CHECKSERVICE);
+	sockaddr_in addr = {0,};
+	addr.sin_family      = AF_INET;
+	addr.sin_port        = htons(CHECKSERVICE);
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	int iResult = ::bind(sock, (struct sockaddr*)&addr, sizeof(addr));
@@ -113,15 +113,18 @@ void* thread_heart(void* p)
 	struct ip_mreq mreq;
 	mreq.imr_multiaddr.s_addr = inet_addr("225.225.225.225");
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-	if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0)
+	
+    if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0)
 	{
 		return NULL;
 	}
+    
 	while(!closeflag)
 	{
 		socklen_t sz = sizeof(addr);
-		char raw[4096];
+		char raw[4096] = {0,};
 		int dw = recvfrom(sock, raw, sizeof(raw), 0, (struct sockaddr*)&addr, &sz);
+        
 		if (dw == sizeof(DevInfoV101))
 		{
 			DevInfoV101* dvi = (DevInfoV101*)raw;
@@ -137,6 +140,7 @@ void* thread_heart(void* p)
 				uptodate(conn);
 			}
 		}
+        
 		if (dw == sizeof(DevInfo2))
 		{
 			DevInfo2* dvi = (DevInfo2*)raw;
@@ -154,6 +158,7 @@ void* thread_heart(void* p)
 				uptodate(conn);
 			}
 		}
+        
 		if (dw == sizeof(DevInfo))
 		{
 			DevInfo* dvi = (DevInfo*)raw;

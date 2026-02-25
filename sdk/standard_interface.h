@@ -6,6 +6,7 @@
 #include "error.h"
 
 #define SDKVERSION "3.2.2" // SDK版本号
+#define SDKEXTRA "posix"
 
 class BlueSeaLidarSDK
 {

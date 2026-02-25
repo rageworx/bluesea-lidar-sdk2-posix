@@ -6,7 +6,7 @@ static const char *s_root_dir = "web";
 
 static void thread_web(struct mg_connection* c, int ev, void* ev_data, void* fn_data);
 static char* jsonValue(const char* result, const char* message, cJSON* array);
-static void EEpromV101ToStr(EEpromV101* eepromv101, char* version, char* result);
+static void EEpromV101ToStr(EEpromV101* eepromv101, char* version, char* result, size_t result_len);
 static void StringReplace(std::string& strBase, std::string strSrc, std::string strDes);
 
 LidarWebService::LidarWebService(uint16_t port)
@@ -20,13 +20,14 @@ LidarWebService::~LidarWebService()
     stop();
 }
 
-void LidarWebService::run(int lidarID)
+void LidarWebService::run(int32_t lidarID)
 {	
 	char address[64] = {0};
 	snprintf(address, 64, "http://0.0.0.0:%d", m_port);
-	struct mg_mgr mgr; // Event manager
-	mg_log_set("2");   // Set to 3 to enable debug
-	mg_mgr_init(&mgr); // Initialise event manager
+    
+	struct mg_mgr mgr;  /// Event manager
+	mg_log_set("2");    /// Set to 3 to enable debug
+	mg_mgr_init(&mgr);  /// Initialise event manager
 
 	// Create HTTP listener
     mg_http_listen(&mgr, address, thread_web, &lidarID);
@@ -67,7 +68,7 @@ static char *jsonValue(const char *result, const char *message, cJSON *array)
 	return out;
 }
 
-static void EEpromV101ToStr(EEpromV101 *eepromv101, char *version, char *result)
+static void EEpromV101ToStr(EEpromV101 *eepromv101, char *version, char *result, size_t result_len)
 {
 	cJSON *root = cJSON_CreateObject();
     
@@ -178,7 +179,7 @@ static void EEpromV101ToStr(EEpromV101 *eepromv101, char *version, char *result)
 	item = cJSON_CreateString(version);
 	cJSON_AddItemToObject(root, "version", item);
 	char *out = jsonValue("SUCCESS", "", root);
-	sprintf(result, "%s", out);
+	snprintf(result, result_len, "%s", out);
 	free(out);
 }
 
@@ -388,7 +389,7 @@ static void thread_web(struct mg_connection *c, int ev, void *ev_data, void *fn_
 			EEpromV101 *eeprom = new  EEpromV101;
 			char info[1024]={0};
 			BlueSeaLidarSDK::getInstance()->GetDevInfo(id,eeprom);
-			EEpromV101ToStr(eeprom,runcfg->hardwareVersion, info); 
+			EEpromV101ToStr(eeprom,runcfg->hardwareVersion, info, 1024);
 			mg_http_reply(c, 200, "", "%s", info);
 			return;
 		}

@@ -106,5 +106,5 @@ $(LIBOUT): $(CXXOBJS) $(COBJS) $(CXXSVCOBJS) $(CJSONOBJS) $(CMONGOOBJS)
 
 $(BIN_DIR)/demo: example/main.cpp
 	@echo "Building DEMO ($@) ..."
-	@$(CXX) $^ $(CXXFLAGS) -L$(BIN_DIR) -l$(LIB_NM) $(LDFLAGS) -o $@
+	@$(CXX) $^ $(CXXFLAGS) -mconsole -L$(BIN_DIR) -l$(LIB_NM) $(LDFLAGS) -o $@
 

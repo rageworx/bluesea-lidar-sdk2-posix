@@ -17,152 +17,183 @@
 // 传入回调指针的方式打印
 void CallBackMsg(int msgtype, void *param,int length)
 {
-	
 	switch (msgtype)
 	{
-	// 实时雷达点云数据
-	case 1:
-	{
-		UserData *pointdata = (UserData *)param;
-		if (pointdata->type == FRAMEDATA)
-		{
-			 //printf("frame idx:%d  %s\t%d \t num:%d timestamp:%d.%d\n", pointdata->idx, pointdata->connectArg1, pointdata->connectArg2, pointdata->framedata.data.size(), pointdata->framedata.ts[0], pointdata->framedata.ts[1]);
-			//  for (int i = 0; i <pointdata->framedata.data.size(); i++)
-			//  {
-			//  	printf("%s\t%d \t%.5f\t%.3f\t%d\n", pointdata->connectArg1, pointdata->connectArg2,  pointdata->framedata.data[i].angle, pointdata->framedata.data[i].distance, pointdata->framedata.data[i].confidence);
-			//  }
-		}
-		else
-		{
-			 //printf("span idx:%d  %s\t%d \t num:%d timestamp:%d.%d\n", pointdata->idx, pointdata->connectArg1, pointdata->connectArg2, pointdata->spandata.data.N, pointdata->spandata.data.ts[0], pointdata->spandata.data.ts[1]);
-			//  for (int i = 0; i <pointdata->spandata.data.N; i++)
-			//  {
-			//  	printf("%s\t%d \t%.5f\t%.3f\t%d\n", pointdata->connectArg1, pointdata->connectArg2,  pointdata->spandata.data.points[i].angle, pointdata->spandata.data.points[i].distance, pointdata->spandata.data.points[i].confidence);
-			//  }
-		}
-		break;
-	}
-	// 实时报警数据
-	case 2:
-	{
-		LidarMsgHdr *zone = (LidarMsgHdr *)param;
-		uint32_t event = zone->events;
-		std::string text;
-		if (zone->flags % 2 == 1)
-		{
-			// 硬件报警信息
-			if (getbit(event, 0) == 1)
-				text += "供电不足";
-			if (getbit(event, 1) == 1)
-				text += "电机堵转足";
-			if (getbit(event, 2) == 1)
-				text += "测距模块温度过高";
-			if (getbit(event, 3) == 1)
-				text += "网络错误";
-			if (getbit(event, 4) == 1)
-				text += "测距模块无输出";
-			//printf("alarm MSG:%s\n", text.c_str());
-		}
-		if (zone->flags >= 0x100)
-		{
-			// 防区报警信息
-			if (getbit(event, 12) == 1)
-				text += "观察！！！";
-			if (getbit(event, 13) == 1)
-				text += "警戒！！！";
-			if (getbit(event, 14) == 1)
-				text += "报警！！！";
-			if (getbit(event, 15) == 1)
-				text += "遮挡！";
-			if (getbit(event, 16) == 1)
-				text += "无数据";
-			if (getbit(event, 17) == 1)
-				text += "无防区设置";
-			if (getbit(event, 18) == 1)
-				text += "系统内部错误";
-			if (getbit(event, 19) == 1)
-				text += "系统运行异常";
-			if (getbit(event, 20) == 1)
-				// 和上面的第四项重复，这里屏蔽
-				// text+='网络错误\n'
-				if (getbit(event, 21) == 1)
-					text += "设备更新中";
-			if (getbit(event, 22) == 1)
-				text += "零位输出";
-			//printf("Active zone:%d\tMSG:%s\n", zone->zone_actived, text.c_str());
-		}
-		break;
-	}
-	// 获取网络款雷达的全局参数
-	case 3:
-	{
-		EEpromV101 *eepromv101 = (EEpromV101 *)param;
-		// 类型，编号，序列号
-		printf("dev info: 设备编号:%d\t 序列号:%s\t 类型:%s\n", eepromv101->dev_id, eepromv101->dev_sn, eepromv101->dev_type);
-		// ip地址 子网掩码 网关地址 默认目标IP  默认目标udp端口号  默认UDP对外服务端口号
-		char tmp_IPv4[16] = {0};
-		char tmp_mask[16] = {0};
-		char tmp_gateway[16] = {0};
-		char tmp_srv_ip[16] = {0};
+        // 实时雷达点云数据
+        case 1:
+        {
+            UserData *pointdata = (UserData *)param;
+            if (pointdata->type == FRAMEDATA)
+            {
+                 printf("frame idx:%d  %s\t%d \t num:%d timestamp:%d.%d\n", pointdata->idx, pointdata->connectArg1, pointdata->connectArg2, pointdata->framedata.data.size(), pointdata->framedata.ts[0], pointdata->framedata.ts[1]);
+                 for (int i = 0; i <pointdata->framedata.data.size(); i++)
+                 {
+                    printf("%s\t%d \t%.5f\t%.3f\t%d\n", pointdata->connectArg1, pointdata->connectArg2,  pointdata->framedata.data[i].angle, pointdata->framedata.data[i].distance, pointdata->framedata.data[i].confidence);
+                 }
+            }
+            else
+            {
+                printf("span idx:%d  %s\t%d \t num:%d timestamp:%d.%d\n", pointdata->idx, pointdata->connectArg1, pointdata->connectArg2, pointdata->spandata.data.N, pointdata->spandata.data.ts[0], pointdata->spandata.data.ts[1]);
+                for (int i = 0; i <pointdata->spandata.data.N; i++)
+                {
+                    printf("%s\t%d \t%.5f\t%.3f\t%d\n", pointdata->connectArg1, pointdata->connectArg2,  pointdata->spandata.data.points[i].angle, pointdata->spandata.data.points[i].distance, pointdata->spandata.data.points[i].confidence);
+                }
+            }
+        }break;
+    
+        // 实时报警数据
+        case 2:
+        {
+            LidarMsgHdr *zone = (LidarMsgHdr *)param;
+            uint32_t event = zone->events;
+            std::string text;
+            if (zone->flags % 2 == 1)
+            {
+                // 硬件报警信息
+                if (getbit(event, 0) == 1)
+                    text += "Insufficient power supply";
+                if (getbit(event, 1) == 1)
+                    text += "Motor stall";
+                if (getbit(event, 2) == 1)
+                    text += "The ranging module is overheating.";
+                if (getbit(event, 3) == 1)
+                    text += "Network error";
+                if (getbit(event, 4) == 1)
+                    text += "The ranging module has no output.";
+                //printf("alarm MSG:%s\n", text.c_str());
+            }
+            if (zone->flags >= 0x100)
+            {
+                // 防区报警信息
+                if (getbit(event, 12) == 1)
+                    text += "Observe！！！";
+                if (getbit(event, 13) == 1)
+                    text += "Warning！！！";
+                if (getbit(event, 14) == 1)
+                    text += "Alarm！！！";
+                if (getbit(event, 15) == 1)
+                    text += "Obstruction！";
+                if (getbit(event, 16) == 1)
+                    text += "No data";
+                if (getbit(event, 17) == 1)
+                    text += "No defense zone setting";
+                if (getbit(event, 18) == 1)
+                    text += "Internal system error";
+                if (getbit(event, 19) == 1)
+                    text += "System malfunction";
+                if (getbit(event, 20) == 1)
+                    // 和上面的第四项重复，这里屏蔽
+                    // text+='网络错误\n'
+                    if (getbit(event, 21) == 1)
+                        text += "Equipment update in progress";
+                if (getbit(event, 22) == 1)
+                    text += "零位输出";
+                //printf("Active zone:%d\tMSG:%s\n", zone->zone_actived, text.c_str());
+            }
+        }break;
+        
+        // 获取网络款雷达的全局参数
+        case 3:
+        {
+            EEpromV101 *eepromv101 = (EEpromV101 *)param;
+            // 类型，编号，序列号
+            printf("dev info: 设备编号:%d\t 序列号:%s\t 类型:%s\n", eepromv101->dev_id, eepromv101->dev_sn, eepromv101->dev_type);
+            // ip地址 子网掩码 网关地址 默认目标IP  默认目标udp端口号  默认UDP对外服务端口号
+            char tmp_IPv4[16] = {0};
+            char tmp_mask[16] = {0};
+            char tmp_gateway[16] = {0};
+            char tmp_srv_ip[16] = {0};
 
-		snprintf(tmp_IPv4, 16, "%d.%d.%d.%d", \
-                 eepromv101->IPv4[0], eepromv101->IPv4[1], eepromv101->IPv4[2], eepromv101->IPv4[3]);
-		snprintf(tmp_mask, 16, "%d.%d.%d.%d", \
-                 eepromv101->mask[0], eepromv101->mask[1], eepromv101->mask[2], eepromv101->mask[3]);
-		snprintf(tmp_gateway, 16, "%d.%d.%d.%d", \
-                 eepromv101->gateway[0], eepromv101->gateway[1], eepromv101->gateway[2], eepromv101->gateway[3]);
-		snprintf(tmp_srv_ip, 16, "%d.%d.%d.%d", \
-                 eepromv101->srv_ip[0], eepromv101->srv_ip[1], eepromv101->srv_ip[2], eepromv101->srv_ip[3]);
+            snprintf(tmp_IPv4, 16, "%d.%d.%d.%d", \
+                     eepromv101->IPv4[0], eepromv101->IPv4[1], eepromv101->IPv4[2], eepromv101->IPv4[3]);
+            snprintf(tmp_mask, 16, "%d.%d.%d.%d", \
+                     eepromv101->mask[0], eepromv101->mask[1], eepromv101->mask[2], eepromv101->mask[3]);
+            snprintf(tmp_gateway, 16, "%d.%d.%d.%d", \
+                     eepromv101->gateway[0], eepromv101->gateway[1], eepromv101->gateway[2], eepromv101->gateway[3]);
+            snprintf(tmp_srv_ip, 16, "%d.%d.%d.%d", \
+                     eepromv101->srv_ip[0], eepromv101->srv_ip[1], eepromv101->srv_ip[2], eepromv101->srv_ip[3]);
 
-		printf("dev info: ip地址:%s 子网掩码:%s 网关地址:%s 默认目标IP:%s  默认目标udp端口号:%d   默认UDP对外服务端口号:%d\n",
-			   tmp_IPv4, tmp_mask, tmp_gateway, tmp_srv_ip, eepromv101->srv_port, eepromv101->local_port);
+            printf("dev info: ip地址:%s 子网掩码:%s 网关地址:%s 默认目标IP:%s  默认目标udp端口号:%d   默认UDP对外服务端口号:%d\n",
+                   tmp_IPv4, tmp_mask, tmp_gateway, tmp_srv_ip, eepromv101->srv_port, eepromv101->local_port);
 
-		/*char tmp_ranger_bias[8] = {0};
-		memcpy(tmp_ranger_bias, eepromv101->ranger_bias, sizeof(eepromv101->ranger_bias) - 1);*/
-		// 转速 ,电机启动参数,FIR滤波阶数，圈数，分辨率，开机自动上传，固定上传，数据点平滑，去拖点，记录校正系数，网络心跳，记录IO口极性
-		printf("dev info: 转速:%d 电机启动参数:%d FIR滤波阶数:%d 圈数:%d  分辨率:%d   开机自动上传:%d 固定上传:%d  数据点平滑:%d 去拖点:%d   网络心跳:%d  记录IO口极性:%d\n",
-			   eepromv101->RPM, eepromv101->RPM_pulse, eepromv101->fir_filter, eepromv101->cir, eepromv101->with_resample, eepromv101->auto_start,
-			   eepromv101->target_fixed, eepromv101->with_smooth, eepromv101->with_filter, eepromv101->net_watchdog, eepromv101->pnp_flags);
+            /*char tmp_ranger_bias[8] = {0};
+            memcpy(tmp_ranger_bias, eepromv101->ranger_bias, sizeof(eepromv101->ranger_bias) - 1);*/
+            // 转速 ,电机启动参数,FIR滤波阶数，圈数，分辨率，开机自动上传，固定上传，数据点平滑，去拖点，记录校正系数，网络心跳，记录IO口极性
+            printf("dev info #1: \n"
+                   "   - Speed (RPM): %d\n"
+                   "   - Motor starting parameters: %d \n"
+                   "   - FIR filter order: %d \n"
+                   "   - Number of revolutions: %d \n"
+                   "   - Resolution:%d \n"
+                   "   - Automatic upload on boot:%d \n"
+                   "   - Fixed upload:%d \n"
+                   "   - Data point smoothing:%d \n"
+                   "   - Remove dragging points:%d \n"
+                   "   - Network heartbeat:%d \n"
+                   "   - Record I/O port polarity:%d\n",
+                   eepromv101->RPM, 
+                   eepromv101->RPM_pulse, 
+                   eepromv101->fir_filter, 
+                   eepromv101->cir, 
+                   eepromv101->with_resample, 
+                   eepromv101->auto_start,
+                   eepromv101->target_fixed, 
+                   eepromv101->with_smooth, 
+                   eepromv101->with_filter, 
+                   eepromv101->net_watchdog, 
+                   eepromv101->pnp_flags);
 
-		printf("dev info:平滑系数：%d  激活防区：%d  上传数据类型：%d\n", eepromv101->deshadow, eepromv101->zone_acted, eepromv101->should_post);
-		break;
-	}
+            printf("dev info #2: \n"
+                   "   - Smoothing coefficient: %d \n"
+                   "   - Activated zone: %d \n"
+                   "   - Uploaded data type: %d\n", 
+                   eepromv101->deshadow, 
+                   eepromv101->zone_acted, 
+                   eepromv101->should_post);
+        }break;
 
-	// 获取雷达时间戳打印信息(网络款为雷达返回时间戳，串口款为本机接收到的时间戳)
-	case 4:
-	{
-		//DevTimestamp *devtimestamp = (DevTimestamp *)param;
-		//printf("timestamp:lidar_ip:%s lidar_port:%d time:%d delay:%d\n", devtimestamp->ip, devtimestamp->port, devtimestamp->timestamp, devtimestamp->delay);
-		break;
+        // 获取雷达时间戳打印信息(网络款为雷达返回时间戳，串口款为本机接收到的时间戳)
+        case 4:
+        {
+            DevTimestamp *devtimestamp = (DevTimestamp *)param;
+            printf("timestamp:lidar_ip:%s lidar_port:%d time:%d delay:%d\n", 
+                   devtimestamp->ip, 
+                   devtimestamp->port, 
+                   devtimestamp->timestamp, 
+                   devtimestamp->delay);
+        }break;
+        
+        // 打印信息(也可以作为日志写入)
+        case 8:
+        {
+            printf("info: %s\n", (char*)param);
+        }break;
+        
+        case 9:
+        {
+            printf("error: %s\n", (char*)param);
+        }break;
 	}
-	// 打印信息(也可以作为日志写入)
-	case 8:
-	{
-		char result[512];
-		memcpy(result, param, length);
-		printf("info: %s\n", result);
-		break;
-	}
-	case 9:
-	{
-		char result[512];
-		memcpy(result, param, length);
-		printf("error: %s\n", result);
-		break;
-	}
-	}
+    
 	fflush(stdout);
 }
+
 int main(int argc, char **argv)
 {
 	if (argc < 2)
 	{
-		printf("Incorrect number of parameters  %d\n usage : ./demo  ../../config/xxx.txt   At least one txt of Lidar\n", argc);
+		printf("Incorrect number of parameters  %d\n usage : "
+               "%s  ../../config/xxx.txt\n"
+               " -- At least one txt of Lidar\n", argc, argv[0]);
 		return ARG_ERROR_NUM;
 	}
+    
 	BlueSeaLidarSDK *lidarSDK =  BlueSeaLidarSDK::getInstance();
-	int lidar_sum = argc - 1;
-	for (int i = 0; i < lidar_sum; i++)
+    if ( lidarSDK == NULL )
+        return -1;
+    
+	size_t lidar_sum = (size_t)argc - 1;
+	for (size_t i = 0; i < lidar_sum; i++)
 	{
 		const char *cfg_file_name = argv[i + 1];
 		//根据配置文件路径添加相关的雷达
@@ -239,12 +270,14 @@ int main(int argc, char **argv)
 		// lidarSDK->SetNTP(lidarID,"192.168.0.111",133,1);
 
 	}
-	while(1)
+    
+	while( true )
 	{
 		//RunConfig* one = BlueSeaLidarSDK::BlueSeaLidarSDK::getInstance()->getLidar(1);
 		//RunConfig* two = BlueSeaLidarSDK::BlueSeaLidarSDK::getInstance()->getLidar(2);
 		//保持进程不退出
 		msleep(100);
 	}
+    
 	return 0;
 }

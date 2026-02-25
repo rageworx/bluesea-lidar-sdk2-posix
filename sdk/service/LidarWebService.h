@@ -18,7 +18,7 @@ class LidarWebService
         ~LidarWebService();
 
     public:
-        void run(int lidarID);
+        void run(int32_t lidarID);
         void stop();
         
     private:
