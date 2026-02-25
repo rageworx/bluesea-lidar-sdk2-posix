@@ -42,10 +42,9 @@ int BlueSeaLidarSDK::addLidarByPath(const char *cfg_file_name)
 {
 	RunConfig *cfg = new RunConfig;
     
-    if ( cfg == NULL )
-        return -1;
+    if (cfg == NULL) return -1;
     
-	memset(cfg, 0, sizeof(RunConfig));
+	memset((void*)cfg, 0, sizeof(RunConfig));
     
 	if (readConfig(cfg_file_name, cfg->runscript))
 	{

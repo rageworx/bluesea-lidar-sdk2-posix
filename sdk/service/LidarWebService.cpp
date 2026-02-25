@@ -54,7 +54,10 @@ static char *jsonValue(const char *result, const char *message, cJSON *array)
 		array = cJSON_CreateArray();
     
     if ( array == NULL )
+    {
+        // prevent GCC clause guarding warning.
         return NULL;
+    }
     
 	cJSON *root = cJSON_CreateObject();
 	cJSON *item = cJSON_CreateString(result);
@@ -73,7 +76,10 @@ static void EEpromV101ToStr(EEpromV101 *eepromv101, char *version, char *result,
 	cJSON *root = cJSON_CreateObject();
     
     if ( root == NULL )
+    {
+        // prevent GCC clause guarding warning.
         return;
+    }
     
 	// 类型，编号，序列号
 	char tmp_sn[20] = {0};
@@ -279,7 +285,7 @@ static void thread_web(struct mg_connection *c, int ev, void *ev_data, void *fn_
 			if (pointsNum == 0 || pointsNum > MAX_FRAMEPOINTS)
 			{
 				char message[64] = {0};
-				snprintf(message, 64, "get point number unusual %d", pointsNum);
+				snprintf(message, 64, "get point number unusual %zu", pointsNum);
 				char *out = jsonValue("ERROR", message, NULL);
 				mg_http_reply(c, 200, "", "%s", out);
 				free(out);
