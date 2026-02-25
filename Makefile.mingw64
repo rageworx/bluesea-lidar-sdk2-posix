@@ -41,7 +41,7 @@ CXXFLAGS += -I$(SRC_DIR)/service
 CXXFLAGS += -I$(CJSON_DIR)
 CXXFLAGS += -I$(MONGO_DIR)
 
-LDFLAGS += -lws2_32 -liphlpapi -lmman
+LDFLAGS += -lws2_32
 
 LIBOUT =  $(BIN_DIR)/$(TARGET_PKG)
 
