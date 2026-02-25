@@ -52,7 +52,7 @@ COBJS      = $(CSRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 CJSONOBJS  = $(CJSONSRCS:$(CJSON_DIR)/%.c=$(OBJ_DIR)/cJSON/%.o)
 CMONGOOBJS = $(CMONGOSRCS:$(MONGO_DIR)/%.c=$(OBJ_DIR)/mongoose/%.o)
 
-.PHONY: prepare clean demo continue
+.PHONY: prepare clean demo continue distclean
 
 all: prepare continue
 
@@ -74,6 +74,10 @@ clean:
 	@rm -rf $(OBJ_DIR)/cJSON
 	@rm -rf $(OBJ_DIR)/mongoose
 	@rm -rf $(BIN_DIR)/demo
+
+distclean:
+	@rm -rf $(OBJ_DIR)
+	@rm -rf $(BIN_DIR)
 
 $(CXXOBJS): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@echo "Building $@ ... "

@@ -12,6 +12,7 @@ int ioctl(int fd, unsigned long request, ...);
 int change_baud(int fd, int baud)
 { 
 #ifndef _WIN32 
+    // Windows API supports changing baud rate ? nope ..
 	struct termios2 t;  
 	if (ioctl(fd, TCGETS2, &t))    {     
 		return -1;

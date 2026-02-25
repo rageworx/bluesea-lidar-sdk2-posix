@@ -1,5 +1,5 @@
-﻿#ifndef __ERROR_H_
-#define __ERROR_H_
+﻿#ifndef __ERROR_H__
+#define __ERROR_H__
 
 #include <cstdarg>
 
@@ -12,8 +12,6 @@
 #define  SIGNAL_BIND_FAILED     -13     /// 信号绑定函数失败
 #define  FUNCTION_NOT_SUPPORT   -14     /// 该设备不支持此功能
 #define  UNDEFINED_ERROR        -15     /// 未知报错
-
-
 
 
 #define UPDATE_ATTRS_FAILED     -23     /// 更新终端命令失败
@@ -80,4 +78,4 @@ do{ \
         printf("Error %s,%s,%d:"info"",__FILE__,__FUNCTION__,__LINE__,##__VA_ARGS__);}\
 }while(0)
 
-#endif
+#endif /// of __ERROR_H__

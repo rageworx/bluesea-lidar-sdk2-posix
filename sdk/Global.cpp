@@ -28,6 +28,18 @@ int putHandle( HANDLE h )
     return (int)handleStore.size() - 1;
 }
 
+void remHandle( HANDLE h )
+{
+    for(size_t cnt=0; cnt<handleStore.size(); cnt++ )
+    {
+        if ( handleStore[cnt] == h )
+        {
+            handleStore.erase( handleStore.begin() + cnt );
+            return;
+        }
+    }
+}
+
 HANDLE getHandle( int idx )
 {
     if ( (size_t)idx < handleStore.size() )
@@ -1444,12 +1456,17 @@ int SystemAPI::closefd(int __fd, bool isSocket)
 #ifdef _WIN32
 	if (!isSocket)
     {
-        HANDLE hHnd = getHandle(  __fd );
+        HANDLE hHnd = getHandle( __fd );
         if ( hHnd != INVALID_HANDLE_VALUE )
+        {
+            remHandle( hHnd );
             CloseHandle( hHnd );
+        }
     }
 	else
+    {
 		closesocket(__fd);
+    }
     
 	return 0;
 #elif __linux
@@ -1466,7 +1483,9 @@ std::vector<std::string> SystemAPI::GetComPort()
 	std::vector<std::string> comName;
 	char portName[256], commName[256];
 	//打开串口注册表对应的键值
-	if (ERROR_SUCCESS == ::RegOpenKeyEx(HKEY_LOCAL_MACHINE, "Hardware\\DeviceMap\\SerialComm", 0, KEY_READ, &hKey))
+	if ( ERROR_SUCCESS == ::RegOpenKeyExA( HKEY_LOCAL_MACHINE, \
+                          "Hardware\\DeviceMap\\SerialComm", \
+                          0, KEY_READ, &hKey) )
 	{
 		int i = 0;
 		int mm = 0;
@@ -1527,22 +1546,24 @@ std::vector<std::string> SystemAPI::GetComPort()
 #ifdef _WIN32
 int Open_serial_port(const char* name, int port)
 {
-	char path[32];
-	sprintf_s(path, 30, "\\\\.\\%s", name);
+	char path[32] = {0};
+	snprintf(path, 32, "\\\\.\\%s", name);
 	// Open the serial port.
-	HANDLE hPort = CreateFile(path,
-		GENERIC_READ | GENERIC_WRITE,		  // Access (read-write) mode
-		FILE_SHARE_READ | FILE_SHARE_WRITE, // Share mode
-		NULL,								  // Pointer to the security attribute
-		OPEN_EXISTING,					  // How to open the serial port
-		0,								  // Port attributes
-		NULL);							  // Handle to port with attribute
+	HANDLE hPort = \
+    CreateFileA(path,
+		GENERIC_READ | GENERIC_WRITE,		/// Access (read-write) mode
+		FILE_SHARE_READ | FILE_SHARE_WRITE, /// Share mode
+		NULL,								/// Pointer to the security attribute
+		OPEN_EXISTING,					  /// How to open the serial port
+		0,								  /// Port attributes
+		NULL);							  /// Handle to port with attribute
 
 	if (hPort == NULL || hPort == INVALID_HANDLE_VALUE)
 	{
 		// MessageBox(0, "can not open port", name, MB_OK);
 		return 0;
 	}
+
 	DCB PortDCB;
 	// Initialize the DCBlength member.
 	PortDCB.DCBlength = sizeof(DCB);

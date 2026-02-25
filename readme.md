@@ -1,8 +1,12 @@
-# BlueSea Lidar SDK2 for MinGW-W64 (POSIX)
-This repository modified all codes for MinGW-W64 (POSIX) model.
+# BlueSea Lidar SDK2 for POSIX
+This repository modified all codes for these models
+
+* MinGW-W64 ( Windows )
+* macOS ( WIP : since macOS 11, maybe )
+* Linux ( WIP : all architectures )
 
 ## USB-LIDAR DESCRIPTION
-windows/linux SDK and Demo programs for lanhai 2d lidar
+Windows/linux SDK and Demo programs for lanhai 2d lidar
 
 # HOW TO BUILD AND USE
 

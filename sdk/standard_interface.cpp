@@ -1,5 +1,5 @@
 ﻿#include "standard_interface.h"
-#include "service/LidarWebService.h"
+#include "LidarWebService.h"
 
 BlueSeaLidarSDK *BlueSeaLidarSDK::m_sdk = new (std::nothrow) BlueSeaLidarSDK();
 ;
