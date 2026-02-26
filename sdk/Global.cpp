@@ -50,7 +50,7 @@ HANDLE getHandle( int idx )
 
 #endif /// of _WIN32
 
-inline int32_t _write( int fd, const char* d, size_t l )
+int32_t _write( int fd, const char* d, size_t l )
 {
 #ifdef _WIN32
     // Windows need WriteFile() instead of _write().
@@ -64,7 +64,7 @@ inline int32_t _write( int fd, const char* d, size_t l )
 #endif
 }
 
-inline int32_t _read( int fd, char* d, size_t l )
+int32_t _read( int fd, char* d, size_t l )
 {
 #ifdef _WIN32
     // Windows need WriteFile() instead of _write().
@@ -203,13 +203,15 @@ int AlgorithmAPI::ShadowsFilter(UserData* scan_in, const ShadowsFilterParam& par
 	return nr;
 }
 
-
 int32_t AlgorithmAPI::MedianFilter(UserData* scan_in, \
                                    const MedianFilterParam& param)
 {
     int32_t* dists = new int32_t[scan_in->framedata.data.size()];
 
-    if ( dists == NULL ) return -1;
+    if ( dists == NULL )
+    {
+        return -1;
+    }
     
 	int32_t* buf = new int32_t[param.window * 2 + 1];
     
@@ -280,7 +282,10 @@ static bool GetData0xC7(const RawDataHdr7& hdr, uint8_t* pdat, \
 
 	FanSegment_C7* fan_seg = GetFanSegment(hdr, pdat, with_chk);
     
-	if ( fan_seg == NULL ) return NULL;
+	if ( fan_seg == NULL )
+    {
+        return NULL;
+    }
 
 	if (*last_fan_seg != NULL)
 	{
@@ -368,7 +373,10 @@ bool GetData0xAA( const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk, \
 
 	FanSegment_AA* fan_seg = GetFanSegment(hdr, pdat, with_chk);
 
-	if ( fan_seg == NULL ) return false;
+	if ( fan_seg == NULL )
+    {
+        return false;
+    }
 
 	if (*last_fan_seg != NULL)
 	{
@@ -1635,7 +1643,8 @@ std::vector<std::string> SystemAPI::GetComPort()
 	struct dirent* dp;
 
 	dirp = opendir(path.c_str());
-	if (dirp == NULL) {
+	if (dirp == NULL) 
+    {
 		printf("opendir %s failed\n", path.c_str());
 		return comName;
 	}
@@ -2083,7 +2092,10 @@ void CommunicationAPI::send_cmd_udp(int fd_udp, const char* dev_ip, \
 {
 	char* buffer = new char[ sizeof(CmdHeader) + len ];
     
-    if ( buffer == NULL ) return;
+    if ( buffer == NULL )
+    {
+        return;
+    }
     
 	CmdHeader* hdr = (CmdHeader*)buffer;
 	hdr->sign  = 0x484c;
@@ -2340,6 +2352,7 @@ static FanSegment_AA* GetFanSegment(const RawDataHdrAA& hdr, uint8_t* pdat, bool
 		fprintf(stderr,"memory allocation failure\n");
 		return NULL;
 	}
+    
 	fan_seg->hdr = hdr;
 	fan_seg->next = NULL;
 

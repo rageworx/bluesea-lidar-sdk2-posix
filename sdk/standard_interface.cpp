@@ -42,7 +42,10 @@ int BlueSeaLidarSDK::addLidarByPath(const char *cfg_file_name)
 {
 	RunConfig *cfg = new RunConfig;
     
-    if (cfg == NULL) return -1;
+    if (cfg == NULL)
+    {
+        return -1;
+    }
     
 	memset((void*)cfg, 0, sizeof(RunConfig));
     
@@ -99,7 +102,9 @@ bool BlueSeaLidarSDK::openDev(int ID)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
     
 	if (strcmp(lidar->runscript.type, "uart") == 0 \
         || strcmp(lidar->runscript.type, "vpc") == 0)
@@ -115,7 +120,9 @@ bool BlueSeaLidarSDK::openDev(int ID)
 
 		if (pthread_create(&lidar->thread_data, \
                            NULL, lidar_thread_proc_uart, lidar) != 0)
+        {
 			return false;
+        }
 	}
 	else
     if (strcmp(lidar->runscript.type, "udp") == 0)
@@ -180,7 +187,9 @@ bool BlueSeaLidarSDK::GetDevInfo(int ID, EEpromV101* eepromv101)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	lidar->action = GETALLPARAMS;
 	size_t index = 30;
@@ -198,6 +207,7 @@ bool BlueSeaLidarSDK::GetDevInfo(int ID, EEpromV101* eepromv101)
 			return true;
 		}
 	}
+    
 	return false;
 }
 
@@ -274,7 +284,9 @@ bool BlueSeaLidarSDK::OpenLocalService(int ID)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
     
 	lidar->webservice = new LidarWebService(lidar->runscript.service_port);
     
@@ -301,7 +313,9 @@ bool BlueSeaLidarSDK::CloseLocalService(int ID)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	if (m_lidars[ID]->state == WORK_AND_WEB)
 	{
@@ -348,7 +362,9 @@ bool BlueSeaLidarSDK::ControlDrv(int ID, int num, char *cmd)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	lidar->mode     = C_PACK;
 	lidar->send_len = num;
@@ -391,7 +407,9 @@ bool BlueSeaLidarSDK::ZoneSection(int ID, char section)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	// 判断传入的防区是否合法
 	if ((section >= 48 && section <= 57) || (section >= 65 && section <= 70))
@@ -417,7 +435,9 @@ bool BlueSeaLidarSDK::SetUDP(int ID, char *ip, char *mask, char *gateway, int po
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	char result[64] = {0};
     
@@ -453,7 +473,9 @@ bool BlueSeaLidarSDK::SetDST(int ID, char *ip, int port)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	char result[50] = {0};
     char noaddr[2] = "";
@@ -482,7 +504,9 @@ bool BlueSeaLidarSDK::SetRPM(int ID, int RPM)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	// 对传入的格式校验
 	if (RPM < 300 || RPM > 3000)
@@ -509,7 +533,9 @@ bool BlueSeaLidarSDK::SetTFX(int ID, bool tfx)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	char cmd[16] = {0};
 	snprintf(cmd, 16, "LSTFX:%dH", tfx);
@@ -530,7 +556,9 @@ bool BlueSeaLidarSDK::SetDSW(int ID, bool dsw)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	char cmd[16] = {0};
 	snprintf(cmd, 16, "LFFF%dH", dsw);
@@ -551,7 +579,9 @@ bool BlueSeaLidarSDK::SetSMT(int ID, bool smt)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	char cmd[16] = {0};
 	snprintf(cmd, 16, "LSSS%dH", smt);
@@ -572,7 +602,9 @@ bool BlueSeaLidarSDK::SetPST(int ID, int mode)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	if (mode <= 0 || mode > 3)
 		return false;
@@ -596,7 +628,9 @@ bool BlueSeaLidarSDK::SetDID(int ID, uint32_t did)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	char cmd[16] = {0};
 	snprintf(cmd, 16, "LSDID:%uH", did);
@@ -617,7 +651,9 @@ bool BlueSeaLidarSDK::SetNTP(int ID, char *ntp_ip, uint16_t port, bool enable)
 	}
     
 	if (lidar == NULL)
+    {
 		return false;
+    }
 
 	char cmd[64] = {0,};
 	char ip_1[4] = {0,};

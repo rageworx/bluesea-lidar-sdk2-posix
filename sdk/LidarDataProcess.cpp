@@ -29,6 +29,9 @@
 #include <sys/socket.h>
 #endif
 
+extern int32_t _write( int fd, const char* d, size_t l );
+extern int32_t _read( int fd, char* d, size_t l );
+
 bool setup_lidar_udp(int fd_udp, RunScript *arg)
 {
 	char buf[32] = {0};
@@ -122,7 +125,7 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 			memcpy(ip_3, &arg->ntp_ip[idx[1] + 1], idx[2] - idx[1] - 1);
 			memcpy(ip_4, &arg->ntp_ip[idx[2] + 1], ip_len - idx[2]);
 			sprintf(cmd, "LSNTP:%d,%03d.%03d.%03d.%03d,%05dH", arg->ntp_enable, atoi(ip_1), atoi(ip_2), atoi(ip_3), atoi(ip_4), arg->ntp_port);
-			// printf(" 1:%s 2:%s 3:%s 4:%s   5:%s\n",ip_1,ip_2,ip_3,ip_4,cmd);
+
 			if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, strlen(cmd), cmd, result))
 			{
 				printf("set LiDAR ntp %s\n", result);
@@ -281,7 +284,7 @@ void *lidar_thread_proc_uart(void *param)
 		if (cfg->fd > 0 && FD_ISSET(cfg->fd, &fds))
 #endif // _WIN32
 		{
-			int nr = read(cfg->fd, buf + buf_len, BUF_SIZE - buf_len);
+			int nr = _read(cfg->fd, buf + buf_len, BUF_SIZE - buf_len);
 			if (nr < 0)
 			{
 				sprintf(info, "read port %d error %d", buf_len, nr);
@@ -303,8 +306,8 @@ void *lidar_thread_proc_uart(void *param)
 
 		if (buf_len > 0)
 		{
-			int consume = 0; // in order to compute the rest of data after every parser process
-			// int res = -1;
+            // in order to compute the rest of data after every parser process
+			int consume = 0; 
 			RawData dat;
 			if (data_bytes == 3)
 			{
@@ -317,185 +320,180 @@ void *lidar_thread_proc_uart(void *param)
 			{
 				is_pack = ParseAPI::parse_data(buf_len, buf, &uartstate, dat, consume, true);
 			}
+            
 			switch (is_pack)
 			{
-			case 1:
-			{
-				if (collect_angle == -1)
-				{
-					// 获取当前雷达的起始统计角度
-					if (state < 0)
-					{
-						state = UserAPI::autoGetFirstAngle(dat, cfg->runscript.from_zero, whole_datas, error);
-					}
-					if (state >= 0)
-					{
-						collect_angle = state;
-						cfg->action = ONLINE;
-						sprintf(info, "Lidar start work,first span angle is %d", collect_angle / 10);
-						cfg->callback(8, info, strlen(info) + 1);
-					}
-					break;
-				}
-				if (cfg->runscript.output_360)
-				{
-					ret = UserAPI::whole_data_process(dat, collect_angle, whole_datas, error);
-					if (cfg->action >= RUN && ret == -1)
-					{
-						timeval tv;
-						gettimeofday(&tv, NULL);
-						if (tv.tv_sec - start_tv.tv_sec > 2)
-						{
-							sprintf(info, "%ld %ld span err  code:%d value:%s ", tv.tv_sec, tv.tv_usec, ret, error.c_str());
-							cfg->callback(9, info, strlen(info) + 1);
-							error = "";
-						}
-					}
-					if (ret == 1)
-					{
-                        pthread_mutex_lock( &cfg->userdata.framedata.datalock );
-						cfg->userdata.framedata.data.clear();
-                        pthread_mutex_unlock( &cfg->userdata.framedata.datalock );
-						for (std::size_t i = 0; i < whole_datas.size(); i++)
-						{
-							for (int j = 0; j < whole_datas.at(i).N; j++)
-							{
-								cfg->userdata.framedata.data.push_back(whole_datas.at(i).points[j]);
-							}
-						}
-						// 执行回调函数
-						if (cfg->userdata.framedata.data.size() > 0)
-						{
-							if (cfg->runscript.shadows_filter.enable)
-							{
-								AlgorithmAPI::ShadowsFilter(&cfg->userdata, cfg->runscript.shadows_filter);
-							}
-							if (cfg->runscript.median_filter.enable)
-							{
-								AlgorithmAPI::MedianFilter(&cfg->userdata, cfg->runscript.median_filter);
-							}
-							if (checkPointsLengthZero(&cfg->userdata, cfg->runscript.error_scale))
-								error_num++;
-							else
-								error_num = 0;
-							if (cfg->runscript.error_circle <= error_num)
-							{
-								sprintf(info, "%s %d There are many points with a distance of 0 in the current lidar operation", cfg->runscript.connectArg, cfg->runscript.connectArg2);
-								cfg->callback(3, info, strlen(info) + 1);
-								error_num = 0;
-							}
-						}
-						if (cfg->runscript.separation_filter.filter_open)
-						{
+                case 1:
+                {
+                    if (collect_angle == -1)
+                    {
+                        // 获取当前雷达的起始统计角度
+                        if (state < 0)
+                        {
+                            state = UserAPI::autoGetFirstAngle(dat, cfg->runscript.from_zero, whole_datas, error);
+                        }
+                        if (state >= 0)
+                        {
+                            collect_angle = state;
+                            cfg->action = ONLINE;
+                            sprintf(info, "Lidar start work,first span angle is %d", collect_angle / 10);
+                            cfg->callback(8, info, strlen(info) + 1);
+                        }
+                        break;
+                    }
+                    if (cfg->runscript.output_360)
+                    {
+                        ret = UserAPI::whole_data_process(dat, collect_angle, whole_datas, error);
+                        if (cfg->action >= RUN && ret == -1)
+                        {
+                            timeval tv;
+                            gettimeofday(&tv, NULL);
+                            if (tv.tv_sec - start_tv.tv_sec > 2)
+                            {
+                                sprintf(info, "%ld %ld span err  code:%d value:%s ", tv.tv_sec, tv.tv_usec, ret, error.c_str());
+                                cfg->callback(9, info, strlen(info) + 1);
+                                error = "";
+                            }
+                        }
+                        if (ret == 1)
+                        {
                             pthread_mutex_lock( &cfg->userdata.framedata.datalock );
-							double angle_increment = 2 * PI / cfg->userdata.framedata.data.size();
-							AlgorithmAPI::filter(cfg->userdata.framedata.data,
-												 cfg->runscript.separation_filter.max_range,
-												 cfg->runscript.separation_filter.min_range,
-												 cfg->runscript.separation_filter.max_range_difference,
-												 cfg->runscript.separation_filter.filter_window, angle_increment);
+                            cfg->userdata.framedata.data.clear();
                             pthread_mutex_unlock( &cfg->userdata.framedata.datalock );
-						}
-						cfg->userdata.idx++;
-						if (strcmp(cfg->runscript.type, "uart") == 0)
-						{
-                            pthread_mutex_lock( &cfg->userdata.framedata.datalock );
-							struct timeval tv;
-							gettimeofday(&tv, NULL);
-							cfg->userdata.framedata.ts[0] = tv.tv_sec;
-							cfg->userdata.framedata.ts[1] = tv.tv_usec;
-                            pthread_mutex_unlock( &cfg->userdata.framedata.datalock );
-						}
-						else if (strcmp(cfg->runscript.type, "vpc") == 0)
-						{
-                            pthread_mutex_lock( &cfg->userdata.framedata.datalock );
-							RawData data = whole_datas.at(whole_datas.size() - 1);
-							cfg->userdata.framedata.ts[0] = data.ts[0];
-							cfg->userdata.framedata.ts[1] = data.ts[1];
-                            pthread_mutex_unlock( &cfg->userdata.framedata.datalock );
-						}
-						whole_datas.clear();
-						cfg->action = RUN;
-					}
-					else
-						break;
-				}
-				// 单独扇区输出
-				else
-				{
+                            for (std::size_t i = 0; i < whole_datas.size(); i++)
+                            {
+                                for (int j = 0; j < whole_datas.at(i).N; j++)
+                                {
+                                    cfg->userdata.framedata.data.push_back(whole_datas.at(i).points[j]);
+                                }
+                            }
+                            // 执行回调函数
+                            if (cfg->userdata.framedata.data.size() > 0)
+                            {
+                                if (cfg->runscript.shadows_filter.enable)
+                                {
+                                    AlgorithmAPI::ShadowsFilter(&cfg->userdata, cfg->runscript.shadows_filter);
+                                }
+                                if (cfg->runscript.median_filter.enable)
+                                {
+                                    AlgorithmAPI::MedianFilter(&cfg->userdata, cfg->runscript.median_filter);
+                                }
+                                if (checkPointsLengthZero(&cfg->userdata, cfg->runscript.error_scale))
+                                    error_num++;
+                                else
+                                    error_num = 0;
+                                if (cfg->runscript.error_circle <= error_num)
+                                {
+                                    sprintf(info, "%s %d There are many points with a distance of 0 in the current lidar operation", cfg->runscript.connectArg, cfg->runscript.connectArg2);
+                                    cfg->callback(3, info, strlen(info) + 1);
+                                    error_num = 0;
+                                }
+                            }
+                            if (cfg->runscript.separation_filter.filter_open)
+                            {
+                                pthread_mutex_lock( &cfg->userdata.framedata.datalock );
+                                double angle_increment = 2 * PI / cfg->userdata.framedata.data.size();
+                                AlgorithmAPI::filter(cfg->userdata.framedata.data,
+                                                     cfg->runscript.separation_filter.max_range,
+                                                     cfg->runscript.separation_filter.min_range,
+                                                     cfg->runscript.separation_filter.max_range_difference,
+                                                     cfg->runscript.separation_filter.filter_window, angle_increment);
+                                pthread_mutex_unlock( &cfg->userdata.framedata.datalock );
+                            }
+                            cfg->userdata.idx++;
+                            if (strcmp(cfg->runscript.type, "uart") == 0)
+                            {
+                                pthread_mutex_lock( &cfg->userdata.framedata.datalock );
+                                struct timeval tv;
+                                gettimeofday(&tv, NULL);
+                                cfg->userdata.framedata.ts[0] = tv.tv_sec;
+                                cfg->userdata.framedata.ts[1] = tv.tv_usec;
+                                pthread_mutex_unlock( &cfg->userdata.framedata.datalock );
+                            }
+                            else if (strcmp(cfg->runscript.type, "vpc") == 0)
+                            {
+                                pthread_mutex_lock( &cfg->userdata.framedata.datalock );
+                                RawData data = whole_datas.at(whole_datas.size() - 1);
+                                cfg->userdata.framedata.ts[0] = data.ts[0];
+                                cfg->userdata.framedata.ts[1] = data.ts[1];
+                                pthread_mutex_unlock( &cfg->userdata.framedata.datalock );
+                            }
+                            whole_datas.clear();
+                            cfg->action = RUN;
+                        }
+                        else
+                            break;
+                    }
+                    // 单独扇区输出
+                    else
+                    {
+                        cfg->userdata.idx++;
+                        memcpy(&cfg->userdata.spandata.data, &dat, sizeof(RawData));
+                        if (strcmp(cfg->runscript.type, "uart") == 0)
+                        {
+                            struct timeval tv;
+                            gettimeofday(&tv, NULL);
+                            cfg->userdata.spandata.data.ts[0] = tv.tv_sec;
+                            cfg->userdata.spandata.data.ts[1] = tv.tv_usec;
+                        }
+                        else if (strcmp(cfg->runscript.type, "vpc") == 0)
+                        {
+                            // 网络款扇区自带时间戳
+                        }
+                        cfg->action = RUN;
+                    }
 
-					cfg->userdata.idx++;
-					memcpy(&cfg->userdata.spandata.data, &dat, sizeof(RawData));
-					if (strcmp(cfg->runscript.type, "uart") == 0)
-					{
-						struct timeval tv;
-						gettimeofday(&tv, NULL);
-						cfg->userdata.spandata.data.ts[0] = tv.tv_sec;
-						cfg->userdata.spandata.data.ts[1] = tv.tv_usec;
-					}
-					else if (strcmp(cfg->runscript.type, "vpc") == 0)
-					{
-						// 网络款扇区自带时间戳
-					}
-					cfg->action = RUN;
-				}
-
-				((void (*)(int, void *))cfg->callback)(1, &cfg->userdata);
-				// 避免累加越界
-				if (cfg->userdata.idx >= MAX_FRAMEIDX)
-					cfg->userdata.idx = 0;
-				break;
-			}
-			case 2:
-			{
-				// 报警信息
-				memcpy(&cfg->zonemsg, &result, sizeof(LidarMsgHdr));
-				((void (*)(int, void *))cfg->callback)(2, &result);
-				cfg->action = FINISH;
-				break;
-			}
-			case 3:
-			{
-				// 全局参数
-				memcpy(&cfg->eepromv101, &result, sizeof(EEpromV101));
-				((void (*)(int, void *))cfg->callback)(3, &result);
-				cfg->action = FINISH;
-				break;
-			}
-			case 4:
-			{
-				// 时间同步返回的应答
-				break;
-			}
-			case 5:
-			{
-				// C_PACK
-				cfg->action = FINISH;
-				break;
-			}
-			case 6:
-			{
-				// S_PACK
-				cfg->action = FINISH;
-				break;
-			}
-			case 7:
-			{
-				// readzone
-				break;
-			}
-			case 8:
-			{
-				// writezone
-				break;
-			}
-			case 9:
-			{
-				// 串口每圈头发送的状态信息
-				// uartstate.with_fitter,uartstate.with_smooth
-				break;
-			}
-			}
+                    ((void (*)(int, void *))cfg->callback)(1, &cfg->userdata);
+                    // 避免累加越界
+                    if (cfg->userdata.idx >= MAX_FRAMEIDX)
+                        cfg->userdata.idx = 0;
+                }break;
+                
+                case 2:
+                {
+                    // 报警信息
+                    memcpy(&cfg->zonemsg, &result, sizeof(LidarMsgHdr));
+                    ((void (*)(int, void *))cfg->callback)(2, &result);
+                    cfg->action = FINISH;
+                }break;
+                
+                case 3:
+                {
+                    // 全局参数
+                    memcpy(&cfg->eepromv101, &result, sizeof(EEpromV101));
+                    ((void (*)(int, void *))cfg->callback)(3, &result);
+                    cfg->action = FINISH;
+                }break;
+                
+                case 4: /// 时间同步返回的应答
+                    break;
+                
+                case 5:
+                {
+                    // C_PACK
+                    cfg->action = FINISH;
+                }break;
+                
+                case 6:
+                {
+                    // S_PACK
+                    cfg->action = FINISH;
+                }break;
+                
+                case 7: /// readzone
+                    break;
+                
+                case 8: /// writezone
+                    break;
+                
+                case 9:
+                {
+                    // 串口每圈头发送的状态信息
+                    // uartstate.with_fitter,uartstate.with_smooth
+                }break;
+                
+			} /// of switch() ..
+            
 			if (consume > 0)
 			{
 				// data is not whole fan,drop it
@@ -512,93 +510,97 @@ void *lidar_thread_proc_uart(void *param)
 				buf_len -= consume;
 			}
 		}
+        
 		// 存在需要操作的指令
 		switch (cfg->action)
 		{
-		case CONTROL:
-		{
-			if (strcmp(cfg->runscript.type, "uart") == 0)
-			{
-				write(cfg->fd, cfg->send_cmd, cfg->send_len);
-			}
-			else if (strcmp(cfg->runscript.type, "vpc") == 0)
-			{
-				CommunicationAPI::send_cmd_vpc(cfg->fd, 0x0043, rand(), cfg->send_len, cfg->send_cmd);
-			}
-			//((void (*)(int, void *))cfg->callback)(6, (char*)"OK");
-			cfg->action = FINISH;
+            case CONTROL:
+            {
+                if (strcmp(cfg->runscript.type, "uart") == 0)
+                {
+                    _write(cfg->fd, cfg->send_cmd, cfg->send_len);
+                }
+                else if (strcmp(cfg->runscript.type, "vpc") == 0)
+                {
+                    CommunicationAPI::send_cmd_vpc(cfg->fd, 0x0043, rand(), cfg->send_len, cfg->send_cmd);
+                }
+                //((void (*)(int, void *))cfg->callback)(6, (char*)"OK");
+                cfg->action = FINISH;
+            }break;
+            
+            case GETALLPARAMS:
+            {
+                char buf[20] = {0};
+                if (strcmp(cfg->runscript.type, "uart") == 0)
+                {
+                    if (CommunicationAPI::uart_talk(cfg->fd, 6, "LUUIDH", 11, "PRODUCT SN:", 16, buf))
+                    {
+#ifdef DEBUG
+                        printf("get LiDAR uuid info:  %s\n", buf);
+#endif /// of DEBUG
+                        std::string str = BaseAPI::stringfilter(buf, 16);
+                        memcpy(cfg->eepromv101.dev_sn, str.c_str(), str.length());
+                    }
+                }
+                else if (strcmp(cfg->runscript.type, "vpc") == 0)
+                {
+                    if (!CommunicationAPI::vpc_talk(cfg->fd, 0x4753, rand(), 6, "LUUIDH", sizeof(EEpromV101), &cfg->eepromv101))
+                    {
+#ifdef DEBUG
+                        printf("vpc GetDevInfo_MSG failed\n");
+#endif /// of DEBUG
+                        strcpy(cfg->recv_cmd, "NG");
+                    }
+                    else
+                        strcpy(cfg->recv_cmd, "OK");
+                }
+                cfg->action = FINISH;                
+            }break;
 
-			break;
-		}
-		case GETALLPARAMS:
-		{
-			char buf[20] = {0};
-			if (strcmp(cfg->runscript.type, "uart") == 0)
-			{
-				if (CommunicationAPI::uart_talk(cfg->fd, 6, "LUUIDH", 11, "PRODUCT SN:", 16, buf))
-				{
-					printf("get LiDAR uuid info:  %s\n", buf);
-					std::string str = BaseAPI::stringfilter(buf, 16);
-					memcpy(cfg->eepromv101.dev_sn, str.c_str(), str.length());
-				}
-			}
-			else if (strcmp(cfg->runscript.type, "vpc") == 0)
-			{
-				if (!CommunicationAPI::vpc_talk(cfg->fd, 0x4753, rand(), 6, "LUUIDH", sizeof(EEpromV101), &cfg->eepromv101))
-				{
-					printf("vpc GetDevInfo_MSG failed\n");
-					strcpy(cfg->recv_cmd, "NG");
-				}
-				else
-					strcpy(cfg->recv_cmd, "OK");
-			}
-			cfg->action = FINISH;
-			break;
-		}
-		case SETPARAM:
-		{
-			if (strcmp(cfg->runscript.type, "vpc") == 0)
-			{
-				cfg->recv_len = 2;
-				if (CommunicationAPI::vpc_talk(cfg->fd, 0x0053, rand(), cfg->send_len, cfg->send_cmd, cfg->recv_len, cfg->recv_cmd))
-				{
-					printf("cmd:%s  recv: %d %s \n", cfg->send_cmd, cfg->recv_len, cfg->recv_cmd);
-					strcpy(cfg->recv_cmd, "OK");
-				}
-				else
-					strcpy(cfg->recv_cmd, "NG");
-			}
-			else if (strcmp(cfg->runscript.type, "uart") == 0)
-			{
-				if (CommunicationAPI::uart_talk(cfg->fd, cfg->send_len, cfg->send_cmd, 2, "OK", 0, NULL))
-				{
-					printf("set %s OK\n", cfg->send_cmd);
-					strcpy(cfg->recv_cmd, "OK");
-				}
-				else
-					strcpy(cfg->recv_cmd, "NG");
-			}
+            case SETPARAM:
+            {
+                if (strcmp(cfg->runscript.type, "vpc") == 0)
+                {
+                    cfg->recv_len = 2;
+                    if (CommunicationAPI::vpc_talk(cfg->fd, 0x0053, rand(), cfg->send_len, cfg->send_cmd, cfg->recv_len, cfg->recv_cmd))
+                    {
+#ifdef DEBUG
+                        printf("cmd:%s  recv: %d %s \n", cfg->send_cmd, cfg->recv_len, cfg->recv_cmd);
+#endif /// of DEBUG
+                        strcpy(cfg->recv_cmd, "OK");
+                    }
+                    else
+                        strcpy(cfg->recv_cmd, "NG");
+                }
+                else if (strcmp(cfg->runscript.type, "uart") == 0)
+                {
+                    if (CommunicationAPI::uart_talk(cfg->fd, cfg->send_len, cfg->send_cmd, 2, "OK", 0, NULL))
+                    {
+#ifdef DEBUG
+                        printf("set %s OK\n", cfg->send_cmd);
+#endif /// of DEBUG
+                        strcpy(cfg->recv_cmd, "OK");
+                    }
+                    else
+                        strcpy(cfg->recv_cmd, "NG");
+                }
 
-			cfg->action = FINISH;
-			break;
-		}
-		case READZONE:
-		{
-			break;
-		}
-		case WRITEZONE:
-		{
-			break;
-		}
-		case ONLINE:
-		{
-			// 说明运行正常
-			break;
-		}
-		default:
-			break;
-		}
-	}
+                cfg->action = FINISH;
+            }break;
+
+            case READZONE:
+                break;
+
+            case WRITEZONE:
+                break;
+            
+            case ONLINE: /// 说明运行正常
+                break;
+            
+            default:
+                break;
+        } /// of switch()
+	} 
 	
     SystemAPI::closefd(cfg->fd, false);
     
@@ -608,7 +610,7 @@ void *lidar_thread_proc_uart(void *param)
 
 int setup_lidar_vpc(int hCom, RunScript *arg)
 {
-	char buf[64];
+	char buf[64] = {0};
 	int nr = 0;
 
 	if (arg->ats >= 0)
@@ -619,6 +621,7 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
 			printf("set LSATS:2H ,result:%s\n", tmp);
 		}
 	}
+    
 	if (arg->with_start >= 0)
 	{
 		if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), 6, "LSTARH", 3, buf))
@@ -630,40 +633,55 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
 	for (int i = 0; i < 300 && nr <= 0; i++)
 	{
 		msleep(10);
-		nr = read(hCom, buf, sizeof(buf));
+		nr = _read(hCom, buf, sizeof(buf));
 	}
+    
 	if (nr <= 0)
 	{
-		printf("serial port seem not working\n");
+#ifdef DEBUG
+		printf("serial port is not availed.\n");
+#endif /// of DEBUG
 		return -1;
 	}
+    
 	// 硬件版本号
 	if (arg->version >= 0)
 	{
 		if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), 6, "LXVERH", 64, buf))
 		{
+#ifdef DEBUG
 			printf("set LiDAR LXVERH  OK  %.16s\n", buf);
+#endif /// of DEBUG
 		}
 	}
+
 	if (arg->uuid >= 0)
 	{
 		if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), 6, "LUUIDH", 32, buf))
 		{
+#ifdef DEBUG
 			printf("set LiDAR LUUIDH  OK  %.16s\n", buf + 10);
+#endif /// of DEBUG
 		}
 	}
+    
 	if (arg->with_deshadow >= 0)
 	{
 		if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), 6, arg->with_deshadow == 0 ? "LFFF0H" : "LFFF1H", 3, buf))
 		{
+#ifdef DEBUG            
 			printf("set deshadow to %d,result:%s\n", arg->with_deshadow, buf);
+#endif /// of DEBUG
 		}
 	}
+    
 	if (arg->with_smooth >= 0)
 	{
 		if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), 6, arg->with_smooth == 0 ? "LSSS0H" : "LSSS1H", 3, buf))
 		{
+#ifdef DEBUG
 			printf("set smooth to %d,result:%s\n", arg->with_smooth, buf);
+#endif /// of DEBUG
 		}
 	}
 
@@ -673,9 +691,12 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
 		sprintf(cmd, "LSRES:%03dH", arg->resample_res);
 		if (CommunicationAPI::vpc_talk(hCom, 0x0053, rand(), sizeof(cmd), cmd, 3, buf))
 		{
+#ifdef DEBUG
 			printf("set LiDAR resample to %d,result:%s\n", arg->resample_res, buf);
+#endif /// of DEBUG
 		}
 	}
+    
 	if (arg->rpm >= 0)
 	{
 		if (arg->rpm > 300 && arg->rpm <= 3000)
@@ -686,12 +707,15 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
 				sprintf(cmd, "LSRPM:%dH", arg->rpm);
 				if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), strlen(cmd), cmd, 3, buf))
 				{
+#ifdef DEBUG
 					printf("set RPM to %s,,result:%s\n", cmd, buf);
+#endif /// of DEBUG
 					break;
 				}
 			}
 		}
 	}
+    
 	return 0;
 }
 
@@ -703,12 +727,12 @@ int setup_lidar_uart(int fd_uart, RunScript *arg, EEpromV101 *eepromv101, char *
 
 	if (arg->with_start >= 0)
 	{
-		write(fd_uart, "LSTARH", 6);
+		_write(fd_uart, "LSTARH", 6);
 	}
 	for (int i = 0; i < 300 && nr <= 0; i++)
 	{
 		msleep(10);
-		nr = read(fd_uart, buf, sizeof(buf));
+		nr = _read(fd_uart, buf, sizeof(buf));
 	}
 	if (nr <= 0)
 	{
@@ -1100,7 +1124,9 @@ void *lidar_thread_proc_udp(void *param)
             {
                 if (!CommunicationAPI::udp_talk_GS_PACK(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, cfg->send_len, cfg->send_cmd, &cfg->eepromv101))
                 {
+#ifdef DEBUG
                     printf("GetDevInfo_MSG failed\n");
+#endif /// of DEBUG
                     strcpy(cfg->recv_cmd, "NG");
                 }
                 else
@@ -1115,7 +1141,9 @@ void *lidar_thread_proc_udp(void *param)
                 {
                     if (CommunicationAPI::udp_talk_S_PACK(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, cfg->send_len, cfg->send_cmd, result))
                     {
+#ifdef DEBUG
                         printf("set LiDAR  %s %s\n", cfg->send_cmd, result);
+#endif /// of DEBUG
                         strcpy(cfg->recv_cmd, result);
                     }
                     else
@@ -1125,7 +1153,9 @@ void *lidar_thread_proc_udp(void *param)
                 {
                     if (CommunicationAPI::udp_talk_C_PACK(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, cfg->send_len, cfg->send_cmd, 2, "OK", 0, NULL))
                     {
+#ifdef DEBUG
                         printf("set LiDAR  %s OK\n", cfg->send_cmd);
+#endif /// of DEBUG
                         strcpy(cfg->recv_cmd, "OK");
                     }
                     else
