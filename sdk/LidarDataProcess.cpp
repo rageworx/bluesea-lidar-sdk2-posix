@@ -29,6 +29,15 @@
 #include <sys/socket.h>
 #endif
 
+#define CAPI_UDPT_SPACK     CommunicationAPI::udp_talk_S_PACK
+#define CAPI_UDPT_CPACK     CommunicationAPI::udp_talk_C_PACK
+#define CAPI_VCPT           CommunicationAPI::vpc_talk
+#define CAPI_SCMD_VPC       CommunicationAPI::send_cmd_vpc
+#define CAPI_UARTT          CommunicationAPI::uart_talk
+#define CAPI_SNDC_UDP       CommunicationAPI::send_cmd_udp
+#define CAPI_UDPT_GSPACK    CommunicationAPI::udp_talk_GS_PACK
+
+// these two functions was declared in Global.cpp.
 extern int32_t _write( int fd, const char* d, size_t l );
 extern int32_t _read( int fd, char* d, size_t l );
 
@@ -39,25 +48,31 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 	if (arg->ats >= 0)
 	{
 		char tmp[3] = {0};
-		if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, 10, "LSATS:001H", tmp))
+		if (CAPI_UDPT_SPACK(fd_udp, arg->connectArg, arg->connectArg2, 10, "LSATS:001H", tmp))
 		{
+#ifdef DEBUG
 			printf("set LSATS:1H ,result:%s\n", tmp);
+#endif /// of DEBUG
 		}
 	}
-	// 初始化默认开始旋转
+	// Initialize default start rotation
 	if (arg->with_start >= 0)
 	{
-		if (CommunicationAPI::udp_talk_C_PACK(fd_udp, arg->connectArg, arg->connectArg2, 6, "LSTARH", 2, "OK", 0, NULL))
+		if (CAPI_UDPT_CPACK(fd_udp, arg->connectArg, arg->connectArg2, 6, "LSTARH", 2, "OK", 0, NULL))
 		{
+#ifdef DEBUG
 			printf("set LiDAR LSTARH  OK \n");
+#endif /// of DEBUG
 		}
 	}
-	// 硬件版本号
+	// Hardware version number
 	if (arg->version >= 0)
 	{
-		if (CommunicationAPI::udp_talk_C_PACK(fd_udp, arg->connectArg, arg->connectArg2, 6, "LVERSH", 14, "MOTOR VERSION:", 15, buf))
+		if (CAPI_UDPT_CPACK(fd_udp, arg->connectArg, arg->connectArg2, 6, "LVERSH", 14, "MOTOR VERSION:", 15, buf))
 		{
+#ifdef DEBUG
 			printf("set LiDAR LXVERH  OK %.12s\n", buf);
+#endif /// of DEBUG
 		}
 	}
     
@@ -66,13 +81,15 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 	{
 		char cmd[12] = {0};
 		snprintf(cmd, 12, "LSDSW:%dH", arg->with_deshadow);
-		if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, sizeof(cmd), cmd, result))
+		if (CAPI_UDPT_SPACK(fd_udp, arg->connectArg, arg->connectArg2, sizeof(cmd), cmd, result))
 		{
+#ifdef DEBUG
 			printf("set LiDAR deshadow %s %s\n", cmd, result);
+#endif  /// of DEBUG
 		}
 		else
 		{
-			printf("set LiDAR deshadow %s NG\n", cmd);
+			fprintf(stderr,"set LiDAR deshadow %s failure.\n", cmd);
 		}
 	}
     
@@ -80,13 +97,15 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 	{
 		char cmd[12] = {0};
 		snprintf(cmd, 12, "LSSMT:%dH", arg->with_smooth);
-		if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, 6, cmd, result))
+		if (CAPI_UDPT_SPACK(fd_udp, arg->connectArg, arg->connectArg2, 6, cmd, result))
 		{
+#ifdef DEBUG
 			printf("set LiDAR with_smooth %s\n", result);
+#endif /// of DEBUG
 		}
 		else
 		{
-			printf("set LiDAR with_smooth NG\n");
+			fprintf( stderr, "set LiDAR with_smooth, failure.\n");
 		}
 	}
 
@@ -95,7 +114,7 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 		bool ret = judgepcIPAddrIsValid(arg->ntp_ip);
 		if (!ret)
 		{
-			printf("ntp ip set error!");
+			fprintf( stderr, "ntp ip set failure!");
 		}
 		else
 		{
@@ -109,10 +128,10 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 			ip_3[3] = '\0';
 			ip_4[3] = '\0';
 
-			int idx[3];
-			int index = 0;
-			int ip_len = strlen(arg->ntp_ip);
-			for (int i = 0; i < ip_len; i++)
+			size_t idx[3];
+			size_t index = 0;
+			size_t ip_len = strlen(arg->ntp_ip);
+			for (size_t i = 0; i < ip_len; i++)
 			{
 				if (arg->ntp_ip[i] == '.')
 				{
@@ -130,13 +149,15 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
                      atoi(ip_1), atoi(ip_2), atoi(ip_3), atoi(ip_4), \
                      arg->ntp_port);
 
-			if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, strlen(cmd), cmd, result))
+			if (CAPI_UDPT_SPACK(fd_udp, arg->connectArg, arg->connectArg2, strlen(cmd), cmd, result))
 			{
+#ifdef DEBUG
 				printf("set LiDAR ntp %s\n", result);
+#endif /// of DEBUG
 			}
 			else
 			{
-				printf("set LiDAR ntp NG\n");
+				fprintf( stderr, "set LiDAR ntp failure.\n" );
 			}
 		}
 	}
@@ -151,7 +172,7 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 
 		if (buf[0])
 		{
-			if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, strlen(buf), buf, result))
+			if (CAPI_UDPT_SPACK(fd_udp, arg->connectArg, arg->connectArg2, strlen(buf), buf, result))
 			{
 #ifdef DEBUG
 				printf("%s set LiDAR resample %d %s\n", buf, arg->resample_res, result);
@@ -159,18 +180,17 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 			}
 			else
 			{
-#ifdef DEBUG
-				printf("%s set LiDAR resample %d %s\n", buf, arg->resample_res, result);
-#endif /// of DEBUG
+				fprintf( stderr, "%s set LiDAR resample %d %s\n", \
+                         buf, arg->resample_res, result);
 			}
 		}
 	}
     
 	if (arg->rpm >= 0)
 	{
-		char cmd[16];
+		char cmd[16] = {0};
 		snprintf(cmd, 16, "LSRPM:%dH", arg->rpm);
-		if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, strlen(cmd), cmd, result))
+		if (CAPI_UDPT_SPACK(fd_udp, arg->connectArg, arg->connectArg2, strlen(cmd), cmd, result))
 		{
 #ifdef DEBUG
 			printf("set RPM to %d  %s\n", arg->rpm, result);
@@ -178,9 +198,7 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 		}
 		else
 		{
-#ifdef DEBUG
-			printf("set RPM to %d  NG  \n", arg->rpm);
-#endif /// of DEBUG
+			fprintf( stderr, "set RPM to %d failure.\n", arg->rpm );
 		}
 	}
     
@@ -188,7 +206,7 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 	{
 		char cmd[12] = {0};
 		snprintf(cmd, 12, "LSPST:%dH", arg->alarm_msg == 1 ? 3 : 1);
-		if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, sizeof(cmd), cmd, result))
+		if (CAPI_UDPT_SPACK(fd_udp, arg->connectArg, arg->connectArg2, sizeof(cmd), cmd, result))
 		{
 #ifdef DEBUG
 			printf("set LiDAR %s %s\n", cmd, result);
@@ -196,9 +214,7 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 		}
 		else
 		{
-#ifdef DEBUG
-			printf("set LiDAR should_post NG\n");
-#endif /// of DEBUG
+			fprintf( stderr, "set LiDAR should_post failure.\n" );
 		}
 	}
     
@@ -206,7 +222,7 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 	{
 		char cmd[12] = {0};
 		snprintf(cmd, 12, "LSCCW:%dH", arg->direction);
-		if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, sizeof(cmd), cmd, result))
+		if (CAPI_UDPT_SPACK(fd_udp, arg->connectArg, arg->connectArg2, sizeof(cmd), cmd, result))
 		{
 #ifdef DEBUG            
 			printf("set LiDAR %s %s\n", cmd, result);
@@ -214,9 +230,7 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 		}
 		else
 		{
-#ifdef DEBUG
-			printf("set LiDAR Rotation direction NG\n");
-#endif /// of DEBUG
+			fprintf( stderr, "set LiDAR Rotation direction failure.\n" );
 		}
 	}
     
@@ -299,7 +313,7 @@ void *lidar_thread_proc_uart(void *param)
 		ret = select(cfg->fd + 1, &fds, NULL, NULL, &to);
 		if (ret < 0)
 		{
-			printf("select error\n");
+			fprintf( stderr, "select(%d) failure.\n", cfg->fd );
 			return NULL;
 		}
 		if (cfg->fd > 0 && FD_ISSET(cfg->fd, &fds))
@@ -466,20 +480,20 @@ void *lidar_thread_proc_uart(void *param)
                         }
                         else if (strcmp(cfg->runscript.type, "vpc") == 0)
                         {
-                            // 网络款扇区自带时间戳
+                            // Network-enabled sectors have built-in timestamps
                         }
                         cfg->action = RUN;
                     }
 
                     ((void (*)(int, void *))cfg->callback)(1, &cfg->userdata);
-                    // 避免累加越界
+                    // Avoid cumulative out-of-bounds
                     if (cfg->userdata.idx >= MAX_FRAMEIDX)
                         cfg->userdata.idx = 0;
                 }break;
                 
                 case 2:
                 {
-                    // 报警信息
+                    // Alarm information
                     memcpy(&cfg->zonemsg, &result, sizeof(LidarMsgHdr));
                     ((void (*)(int, void *))cfg->callback)(2, &result);
                     cfg->action = FINISH;
@@ -487,26 +501,22 @@ void *lidar_thread_proc_uart(void *param)
                 
                 case 3:
                 {
-                    // 全局参数
+                    // global parameters
                     memcpy(&cfg->eepromv101, &result, sizeof(EEpromV101));
                     ((void (*)(int, void *))cfg->callback)(3, &result);
                     cfg->action = FINISH;
                 }break;
                 
-                case 4: /// 时间同步返回的应答
+                case 4: /// Response returned by time synchronization
                     break;
                 
-                case 5:
-                {
-                    // C_PACK
+                case 5: /// C_PACK
                     cfg->action = FINISH;
-                }break;
+                    break;
                 
-                case 6:
-                {
-                    // S_PACK
+                case 6: /// S_PACK
                     cfg->action = FINISH;
-                }break;
+                    break;
                 
                 case 7: /// readzone
                     break;
@@ -539,7 +549,7 @@ void *lidar_thread_proc_uart(void *param)
 			}
 		}
         
-		// 存在需要操作的指令
+		// There are instructions that need to be performed.
 		switch (cfg->action)
 		{
             case CONTROL:
@@ -550,9 +560,9 @@ void *lidar_thread_proc_uart(void *param)
                 }
                 else if (strcmp(cfg->runscript.type, "vpc") == 0)
                 {
-                    CommunicationAPI::send_cmd_vpc(cfg->fd, 0x0043, rand(), cfg->send_len, cfg->send_cmd);
+                    CAPI_SCMD_VPC(cfg->fd, 0x0043, rand(), cfg->send_len, cfg->send_cmd);
                 }
-                //((void (*)(int, void *))cfg->callback)(6, (char*)"OK");
+
                 cfg->action = FINISH;
             }break;
             
@@ -561,7 +571,7 @@ void *lidar_thread_proc_uart(void *param)
                 char buf[20] = {0};
                 if (strcmp(cfg->runscript.type, "uart") == 0)
                 {
-                    if (CommunicationAPI::uart_talk(cfg->fd, 6, "LUUIDH", 11, "PRODUCT SN:", 16, buf))
+                    if (CAPI_UARTT(cfg->fd, 6, "LUUIDH", 11, "PRODUCT SN:", 16, buf))
                     {
 #ifdef DEBUG
                         printf("get LiDAR uuid info:  %s\n", buf);
@@ -572,11 +582,9 @@ void *lidar_thread_proc_uart(void *param)
                 }
                 else if (strcmp(cfg->runscript.type, "vpc") == 0)
                 {
-                    if (!CommunicationAPI::vpc_talk(cfg->fd, 0x4753, rand(), 6, "LUUIDH", sizeof(EEpromV101), &cfg->eepromv101))
+                    if (!CAPI_VCPT(cfg->fd, 0x4753, rand(), 6, "LUUIDH", sizeof(EEpromV101), &cfg->eepromv101))
                     {
-#ifdef DEBUG
-                        printf("vpc GetDevInfo_MSG failed\n");
-#endif /// of DEBUG
+                        fprintf( stderr, "vpc GetDevInfo_MSG failure.\n" );
                         strcpy(cfg->recv_cmd, "NG");
                     }
                     else
@@ -590,7 +598,7 @@ void *lidar_thread_proc_uart(void *param)
                 if (strcmp(cfg->runscript.type, "vpc") == 0)
                 {
                     cfg->recv_len = 2;
-                    if (CommunicationAPI::vpc_talk(cfg->fd, 0x0053, rand(), cfg->send_len, cfg->send_cmd, cfg->recv_len, cfg->recv_cmd))
+                    if (CAPI_VCPT(cfg->fd, 0x0053, rand(), cfg->send_len, cfg->send_cmd, cfg->recv_len, cfg->recv_cmd))
                     {
 #ifdef DEBUG
                         printf("cmd:%s  recv: %d %s \n", cfg->send_cmd, cfg->recv_len, cfg->recv_cmd);
@@ -602,7 +610,7 @@ void *lidar_thread_proc_uart(void *param)
                 }
                 else if (strcmp(cfg->runscript.type, "uart") == 0)
                 {
-                    if (CommunicationAPI::uart_talk(cfg->fd, cfg->send_len, cfg->send_cmd, 2, "OK", 0, NULL))
+                    if (CAPI_UARTT(cfg->fd, cfg->send_len, cfg->send_cmd, 2, "OK", 0, NULL))
                     {
 #ifdef DEBUG
                         printf("set %s OK\n", cfg->send_cmd);
@@ -644,21 +652,25 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
 	if (arg->ats >= 0)
 	{
 		char tmp[3] = {0};
-		if (CommunicationAPI::vpc_talk(hCom, 0x0053, rand(), 10, "LSATS:002H", 3, tmp))
+		if (CAPI_VCPT(hCom, 0x0053, rand(), 10, "LSATS:002H", 3, tmp))
 		{
+#ifdef DEBUG
 			printf("set LSATS:2H ,result:%s\n", tmp);
+#endif /// of DEBUG
 		}
 	}
     
 	if (arg->with_start >= 0)
 	{
-		if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), 6, "LSTARH", 3, buf))
+		if (CAPI_VCPT(hCom, 0x0043, rand(), 6, "LSTARH", 3, buf))
 		{
+#ifdef DEBUG
 			printf("set LSTARH ,result:%s\n", buf);
+#endif /// of DEBUG
 		}
 	}
 
-	for (int i = 0; i < 300 && nr <= 0; i++)
+	for (size_t i = 0; i < 300 && nr <= 0; i++)
 	{
 		msleep(10);
 		nr = _read(hCom, buf, sizeof(buf));
@@ -675,7 +687,7 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
 	// 硬件版本号
 	if (arg->version >= 0)
 	{
-		if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), 6, "LXVERH", 64, buf))
+		if (CAPI_VCPT(hCom, 0x0043, rand(), 6, "LXVERH", 64, buf))
 		{
 #ifdef DEBUG
 			printf("set LiDAR LXVERH  OK  %.16s\n", buf);
@@ -685,7 +697,7 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
 
 	if (arg->uuid >= 0)
 	{
-		if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), 6, "LUUIDH", 32, buf))
+		if (CAPI_VCPT(hCom, 0x0043, rand(), 6, "LUUIDH", 32, buf))
 		{
 #ifdef DEBUG
 			printf("set LiDAR LUUIDH  OK  %.16s\n", buf + 10);
@@ -695,7 +707,7 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
     
 	if (arg->with_deshadow >= 0)
 	{
-		if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), 6, arg->with_deshadow == 0 ? "LFFF0H" : "LFFF1H", 3, buf))
+		if (CAPI_VCPT(hCom, 0x0043, rand(), 6, arg->with_deshadow == 0 ? "LFFF0H" : "LFFF1H", 3, buf))
 		{
 #ifdef DEBUG            
 			printf("set deshadow to %d,result:%s\n", arg->with_deshadow, buf);
@@ -705,7 +717,7 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
     
 	if (arg->with_smooth >= 0)
 	{
-		if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), 6, arg->with_smooth == 0 ? "LSSS0H" : "LSSS1H", 3, buf))
+		if (CAPI_VCPT(hCom, 0x0043, rand(), 6, arg->with_smooth == 0 ? "LSSS0H" : "LSSS1H", 3, buf))
 		{
 #ifdef DEBUG
 			printf("set smooth to %d,result:%s\n", arg->with_smooth, buf);
@@ -717,7 +729,7 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
 	{
 		char cmd[32];
 		snprintf(cmd, 32, "LSRES:%03dH", arg->resample_res);
-		if (CommunicationAPI::vpc_talk(hCom, 0x0053, rand(), sizeof(cmd), cmd, 3, buf))
+		if (CAPI_VCPT(hCom, 0x0053, rand(), sizeof(cmd), cmd, 3, buf))
 		{
 #ifdef DEBUG
 			printf("set LiDAR resample to %d,result:%s\n", arg->resample_res, buf);
@@ -733,7 +745,7 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
 			{
 				char cmd[32];
 				snprintf(cmd, 32, "LSRPM:%dH", arg->rpm);
-				if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), strlen(cmd), cmd, 3, buf))
+				if (CAPI_VCPT(hCom, 0x0043, rand(), strlen(cmd), cmd, 3, buf))
 				{
 #ifdef DEBUG
 					printf("set RPM to %s,,result:%s\n", cmd, buf);
@@ -772,7 +784,7 @@ int setup_lidar_uart(int fd_uart, RunScript *arg, EEpromV101 *eepromv101, char *
 	{
 		for (int i = 0; i < index; i++)
 		{
-			if (CommunicationAPI::uart_talk(fd_uart, 6, "LUUIDH", 11, "PRODUCT SN:", 12, buf))
+			if (CAPI_UARTT(fd_uart, 6, "LUUIDH", 11, "PRODUCT SN:", 12, buf))
 			{
 
 				strcpy((char *)eepromv101->dev_sn, buf);
@@ -786,7 +798,7 @@ int setup_lidar_uart(int fd_uart, RunScript *arg, EEpromV101 *eepromv101, char *
 	{
 		for (int i = 0; i < index; i++)
 		{
-			if (CommunicationAPI::uart_talk(fd_uart, 6, "LXVERH", 14, "MOTOR VERSION:", 12, buf))
+			if (CAPI_UARTT(fd_uart, 6, "LXVERH", 14, "MOTOR VERSION:", 12, buf))
 			{
 				printf("get LiDAR version info:  %.12s\n", buf);
 				strcpy(version, buf);
@@ -798,7 +810,7 @@ int setup_lidar_uart(int fd_uart, RunScript *arg, EEpromV101 *eepromv101, char *
 	{
 		for (int i = 0; i < index; i++)
 		{
-			if (CommunicationAPI::uart_talk(fd_uart, 6, "LTYPEH", 8, "TYPE ID:", 16, buf))
+			if (CAPI_UARTT(fd_uart, 6, "LTYPEH", 8, "TYPE ID:", 16, buf))
 			{
 				std::string tmp = BaseAPI::stringfilter(buf, 16);
 				memcpy((char *)eepromv101->dev_type, tmp.c_str(), tmp.length());
@@ -812,7 +824,7 @@ int setup_lidar_uart(int fd_uart, RunScript *arg, EEpromV101 *eepromv101, char *
 	{
 		for (int i = 0; i < index; i++)
 		{
-			if (CommunicationAPI::uart_talk(fd_uart, 6, arg->unit_is_mm == 0 ? "LMDCMH" : "LMDMMH", 6, "LiDAR ", 12, buf))
+			if (CAPI_UARTT(fd_uart, 6, arg->unit_is_mm == 0 ? "LMDCMH" : "LMDMMH", 6, "LiDAR ", 12, buf))
 			{
 				printf("set LiDAR unit %s\n", buf);
 				break;
@@ -824,7 +836,7 @@ int setup_lidar_uart(int fd_uart, RunScript *arg, EEpromV101 *eepromv101, char *
 	{
 		for (int i = 0; i < index; i++)
 		{
-			if (CommunicationAPI::uart_talk(fd_uart, 6, arg->with_confidence == 0 ? "LNCONH" : "LOCONH", 6, "LiDAR ", 12, buf))
+			if (CAPI_UARTT(fd_uart, 6, arg->with_confidence == 0 ? "LNCONH" : "LOCONH", 6, "LiDAR ", 12, buf))
 			{
 				printf("set LiDAR confidence %.02s\n", buf);
 				break;
@@ -836,7 +848,7 @@ int setup_lidar_uart(int fd_uart, RunScript *arg, EEpromV101 *eepromv101, char *
 	{
 		for (int i = 0; i < index; i++)
 		{
-			if (CommunicationAPI::uart_talk(fd_uart, 6, arg->with_deshadow == 0 ? "LFFF0H" : "LFFF1H", 6, "LiDAR ", 12, buf))
+			if (CAPI_UARTT(fd_uart, 6, arg->with_deshadow == 0 ? "LFFF0H" : "LFFF1H", 6, "LiDAR ", 12, buf))
 			{
 				printf("set deshadow %.02s\n", buf);
 				break;
@@ -848,7 +860,7 @@ int setup_lidar_uart(int fd_uart, RunScript *arg, EEpromV101 *eepromv101, char *
 	{
 		for (int i = 0; i < index; i++)
 		{
-			if (CommunicationAPI::uart_talk(fd_uart, 6, arg->with_smooth == 0 ? "LSSS0H" : "LSSS1H", 6, "LiDAR ", 12, buf))
+			if (CAPI_UARTT(fd_uart, 6, arg->with_smooth == 0 ? "LSSS0H" : "LSSS1H", 6, "LiDAR ", 12, buf))
 			{
 				printf("set smooth %.02s\n", buf);
 				break;
@@ -862,7 +874,7 @@ int setup_lidar_uart(int fd_uart, RunScript *arg, EEpromV101 *eepromv101, char *
 		snprintf(cmd, 16, "LSRES:%dH", arg->resample_res);
 		for (int i = 0; i < index; i++)
 		{
-			if (CommunicationAPI::uart_talk(fd_uart, strlen(cmd), cmd, 15, "set resolution ", 12, buf))
+			if (CAPI_UARTT(fd_uart, strlen(cmd), cmd, 15, "set resolution ", 12, buf))
 			{
 				printf("set LiDAR resample %.02s\n", buf);
 				break;
@@ -877,7 +889,7 @@ int setup_lidar_uart(int fd_uart, RunScript *arg, EEpromV101 *eepromv101, char *
 		snprintf(cmd, 16, "LSRPM:%dH", arg->rpm);
 		for (int i = 0; i < index; i++)
 		{
-			if (CommunicationAPI::uart_talk(fd_uart, strlen(cmd), cmd, 8, "Set RPM:", 12, buf))
+			if (CAPI_UARTT(fd_uart, strlen(cmd), cmd, 8, "Set RPM:", 12, buf))
 			{
 				printf("set RPM to %d  %.02s\n", arg->rpm, buf);
 				break;
@@ -961,7 +973,7 @@ void *lidar_thread_proc_udp(void *param)
 				alive.delay = delay;
 
 				// acknowlege device
-				CommunicationAPI::send_cmd_udp(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, 0x4b41, rand(), sizeof(alive), &alive);
+				CAPI_SNDC_UDP(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, 0x4b41, rand(), sizeof(alive), &alive);
 				tto = tv.tv_sec + 1;
 				DevTimestamp devtimestamp;
 				memcpy(devtimestamp.ip, cfg->runscript.connectArg, sizeof(cfg->runscript.connectArg));
@@ -1150,13 +1162,13 @@ void *lidar_thread_proc_udp(void *param)
 		{
             case CONTROL:
             {
-                CommunicationAPI::udp_talk_C_PACK(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, cfg->send_len, cfg->send_cmd, 2, "OK", 0, NULL);
+                CAPI_UDPT_CPACK(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, cfg->send_len, cfg->send_cmd, 2, "OK", 0, NULL);
                 cfg->action = FINISH;                
             } break;
             
             case GETALLPARAMS:
             {
-                if (!CommunicationAPI::udp_talk_GS_PACK(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, cfg->send_len, cfg->send_cmd, &cfg->eepromv101))
+                if (!CAPI_UDPT_GSPACK(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, cfg->send_len, cfg->send_cmd, &cfg->eepromv101))
                 {
 #ifdef DEBUG
                     printf("GetDevInfo_MSG failed\n");
@@ -1173,7 +1185,7 @@ void *lidar_thread_proc_udp(void *param)
             {
                 if (cfg->mode == S_PACK)
                 {
-                    if (CommunicationAPI::udp_talk_S_PACK(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, cfg->send_len, cfg->send_cmd, result))
+                    if (CAPI_UDPT_SPACK(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, cfg->send_len, cfg->send_cmd, result))
                     {
 #ifdef DEBUG
                         printf("set LiDAR  %s %s\n", cfg->send_cmd, result);
@@ -1185,7 +1197,7 @@ void *lidar_thread_proc_udp(void *param)
                 }
                 else if (cfg->mode == C_PACK)
                 {
-                    if (CommunicationAPI::udp_talk_C_PACK(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, cfg->send_len, cfg->send_cmd, 2, "OK", 0, NULL))
+                    if (CAPI_UDPT_CPACK(cfg->fd, cfg->runscript.connectArg, cfg->runscript.connectArg2, cfg->send_len, cfg->send_cmd, 2, "OK", 0, NULL))
                     {
 #ifdef DEBUG
                         printf("set LiDAR  %s OK\n", cfg->send_cmd);
