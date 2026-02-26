@@ -65,7 +65,7 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 	if (arg->with_deshadow >= 0)
 	{
 		char cmd[12] = {0};
-		sprintf(cmd, "LSDSW:%dH", arg->with_deshadow);
+		snprintf(cmd, 12, "LSDSW:%dH", arg->with_deshadow);
 		if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, sizeof(cmd), cmd, result))
 		{
 			printf("set LiDAR deshadow %s %s\n", cmd, result);
@@ -79,7 +79,7 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 	if (arg->with_smooth >= 0)
 	{
 		char cmd[12] = {0};
-		sprintf(cmd, "LSSMT:%dH", arg->with_smooth);
+		snprintf(cmd, 12, "LSSMT:%dH", arg->with_smooth);
 		if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, 6, cmd, result))
 		{
 			printf("set LiDAR with_smooth %s\n", result);
@@ -124,7 +124,11 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 			memcpy(ip_2, &arg->ntp_ip[idx[0] + 1], idx[1] - idx[0] - 1);
 			memcpy(ip_3, &arg->ntp_ip[idx[1] + 1], idx[2] - idx[1] - 1);
 			memcpy(ip_4, &arg->ntp_ip[idx[2] + 1], ip_len - idx[2]);
-			sprintf(cmd, "LSNTP:%d,%03d.%03d.%03d.%03d,%05dH", arg->ntp_enable, atoi(ip_1), atoi(ip_2), atoi(ip_3), atoi(ip_4), arg->ntp_port);
+			snprintf(cmd, 64, \
+                     "LSNTP:%d,%03d.%03d.%03d.%03d,%05dH",  \
+                     arg->ntp_enable, \
+                     atoi(ip_1), atoi(ip_2), atoi(ip_3), atoi(ip_4), \
+                     arg->ntp_port);
 
 			if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, strlen(cmd), cmd, result))
 			{
@@ -141,7 +145,7 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 	{
 		// resample == 0  非固定角分辨率不适用于网络包计算
 		if (arg->resample_res == 1 || (arg->resample_res > 100 && arg->resample_res <= 1500))
-			sprintf(buf, "LSRES:%03dH", arg->resample_res);
+			snprintf(buf, 32, "LSRES:%03dH", arg->resample_res);
 		else
 			buf[0] = 0;
 
@@ -149,53 +153,73 @@ bool setup_lidar_udp(int fd_udp, RunScript *arg)
 		{
 			if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, strlen(buf), buf, result))
 			{
+#ifdef DEBUG
 				printf("%s set LiDAR resample %d %s\n", buf, arg->resample_res, result);
+#endif /// of DEBUG
 			}
 			else
 			{
+#ifdef DEBUG
 				printf("%s set LiDAR resample %d %s\n", buf, arg->resample_res, result);
+#endif /// of DEBUG
 			}
 		}
 	}
+    
 	if (arg->rpm >= 0)
 	{
 		char cmd[16];
-		sprintf(cmd, "LSRPM:%dH", arg->rpm);
+		snprintf(cmd, 16, "LSRPM:%dH", arg->rpm);
 		if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, strlen(cmd), cmd, result))
 		{
+#ifdef DEBUG
 			printf("set RPM to %d  %s\n", arg->rpm, result);
+#endif /// of DEBUG
 		}
 		else
 		{
+#ifdef DEBUG
 			printf("set RPM to %d  NG  \n", arg->rpm);
+#endif /// of DEBUG
 		}
 	}
+    
 	if (arg->alarm_msg >= 0)
 	{
 		char cmd[12] = {0};
-		sprintf(cmd, "LSPST:%dH", arg->alarm_msg == 1 ? 3 : 1);
+		snprintf(cmd, 12, "LSPST:%dH", arg->alarm_msg == 1 ? 3 : 1);
 		if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, sizeof(cmd), cmd, result))
 		{
+#ifdef DEBUG
 			printf("set LiDAR %s %s\n", cmd, result);
+#endif /// of DEBUG
 		}
 		else
 		{
+#ifdef DEBUG
 			printf("set LiDAR should_post NG\n");
+#endif /// of DEBUG
 		}
 	}
+    
 	if (arg->direction >= 0)
 	{
 		char cmd[12] = {0};
-		sprintf(cmd, "LSCCW:%dH", arg->direction);
+		snprintf(cmd, 12, "LSCCW:%dH", arg->direction);
 		if (CommunicationAPI::udp_talk_S_PACK(fd_udp, arg->connectArg, arg->connectArg2, sizeof(cmd), cmd, result))
 		{
+#ifdef DEBUG            
 			printf("set LiDAR %s %s\n", cmd, result);
+#endif /// of DEBUG
 		}
 		else
 		{
+#ifdef DEBUG
 			printf("set LiDAR Rotation direction NG\n");
+#endif /// of DEBUG
 		}
 	}
+    
 	return true;
 }
 
@@ -253,9 +277,6 @@ void *lidar_thread_proc_uart(void *param)
 	else
 		setup_lidar_vpc(cfg->fd, &cfg->runscript);
 
-	// sprintf(info, "All params set OK ! Start parser data");
-	// cfg->callback(8, info, strlen(info) + 1);
-
 	/*
 	 * 4, read and parser data
 	 */
@@ -287,7 +308,7 @@ void *lidar_thread_proc_uart(void *param)
 			int nr = _read(cfg->fd, buf + buf_len, BUF_SIZE - buf_len);
 			if (nr < 0)
 			{
-				sprintf(info, "read port %d error %d", buf_len, nr);
+				snprintf(info, 512, "read port %d error %d", buf_len, nr);
 				cfg->callback(9, info, strlen(info) + 1);
 				break;
 			}
@@ -336,7 +357,9 @@ void *lidar_thread_proc_uart(void *param)
                         {
                             collect_angle = state;
                             cfg->action = ONLINE;
-                            sprintf(info, "Lidar start work,first span angle is %d", collect_angle / 10);
+                            snprintf(info, 512, \
+                                     "Lidar start work,first span angle is %d",\
+                                     collect_angle / 10);
                             cfg->callback(8, info, strlen(info) + 1);
                         }
                         break;
@@ -350,7 +373,10 @@ void *lidar_thread_proc_uart(void *param)
                             gettimeofday(&tv, NULL);
                             if (tv.tv_sec - start_tv.tv_sec > 2)
                             {
-                                sprintf(info, "%ld %ld span err  code:%d value:%s ", tv.tv_sec, tv.tv_usec, ret, error.c_str());
+                                snprintf(info, 512, \
+                                         "%ld %ld span err  code:%d value:%s ",\
+                                         tv.tv_sec, tv.tv_usec, ret, \
+                                         error.c_str());
                                 cfg->callback(9, info, strlen(info) + 1);
                                 error = "";
                             }
@@ -384,7 +410,9 @@ void *lidar_thread_proc_uart(void *param)
                                     error_num = 0;
                                 if (cfg->runscript.error_circle <= error_num)
                                 {
-                                    sprintf(info, "%s %d There are many points with a distance of 0 in the current lidar operation", cfg->runscript.connectArg, cfg->runscript.connectArg2);
+                                    snprintf(info, 512,\
+                                             "%s %d There are many points with a distance of 0 in the current lidar operation", \
+                                             cfg->runscript.connectArg, cfg->runscript.connectArg2);
                                     cfg->callback(3, info, strlen(info) + 1);
                                     error_num = 0;
                                 }
@@ -688,7 +716,7 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
 	if (arg->resample_res >= 0)
 	{
 		char cmd[32];
-		sprintf(cmd, "LSRES:%03dH", arg->resample_res);
+		snprintf(cmd, 32, "LSRES:%03dH", arg->resample_res);
 		if (CommunicationAPI::vpc_talk(hCom, 0x0053, rand(), sizeof(cmd), cmd, 3, buf))
 		{
 #ifdef DEBUG
@@ -704,7 +732,7 @@ int setup_lidar_vpc(int hCom, RunScript *arg)
 			for (int i = 0; i < 5; i++)
 			{
 				char cmd[32];
-				sprintf(cmd, "LSRPM:%dH", arg->rpm);
+				snprintf(cmd, 32, "LSRPM:%dH", arg->rpm);
 				if (CommunicationAPI::vpc_talk(hCom, 0x0043, rand(), strlen(cmd), cmd, 3, buf))
 				{
 #ifdef DEBUG
@@ -831,7 +859,7 @@ int setup_lidar_uart(int fd_uart, RunScript *arg, EEpromV101 *eepromv101, char *
 	if (arg->resample_res >= 0)
 	{
 		char cmd[16];
-		sprintf(cmd, "LSRES:%dH", arg->resample_res);
+		snprintf(cmd, 16, "LSRES:%dH", arg->resample_res);
 		for (int i = 0; i < index; i++)
 		{
 			if (CommunicationAPI::uart_talk(fd_uart, strlen(cmd), cmd, 15, "set resolution ", 12, buf))
@@ -846,7 +874,7 @@ int setup_lidar_uart(int fd_uart, RunScript *arg, EEpromV101 *eepromv101, char *
 	if (arg->rpm >= 0)
 	{
 		char cmd[16];
-		sprintf(cmd, "LSRPM:%dH", arg->rpm);
+		snprintf(cmd, 16, "LSRPM:%dH", arg->rpm);
 		for (int i = 0; i < index; i++)
 		{
 			if (CommunicationAPI::uart_talk(fd_uart, strlen(cmd), cmd, 8, "Set RPM:", 12, buf))
@@ -895,11 +923,13 @@ void *lidar_thread_proc_udp(void *param)
 
 		if (rt < 0)
 		{
-			sprintf(info, "Adding to multicast group %s %s", cfg->runscript.group_ip, rt < 0 ? "fail!" : "ok");
+			snprintf(info, 512, \
+                     "Adding to multicast group %s %s", \
+                     cfg->runscript.group_ip, rt < 0 ? "fail!" : "ok");
 			cfg->callback(9, info, strlen(info) + 1);
 			return NULL;
 		}
-		sprintf(info, "Adding to multicast group success");
+		snprintf(info, 512, "Adding to multicast group success");
 		cfg->callback(8, info, strlen(info) + 1);
 	}
 	else
@@ -907,8 +937,6 @@ void *lidar_thread_proc_udp(void *param)
 		setup_lidar_udp(cfg->fd, &cfg->runscript);
 	}
 
-	// sprintf(info, "All params set OK ! Start parser data");
-	// cfg->callback(8, info, strlen(info) + 1);
 	unsigned char *buf = new unsigned char[BUF_SIZE];
 	struct timeval tv, start_tv;
 	gettimeofday(&tv, NULL);
@@ -944,7 +972,7 @@ void *lidar_thread_proc_udp(void *param)
 			}
 			if (ret < 0)
 			{
-				sprintf(info, "select error");
+				snprintf(info, 512, "select error");
 				cfg->callback(9, info, strlen(info) + 1);
 				break;
 			}
@@ -988,7 +1016,9 @@ void *lidar_thread_proc_udp(void *param)
                                 whole_datas.clear();
                                 collect_angle = state;
                                 cfg->action = ONLINE;
-                                sprintf(info, "Lidar start work,first span angle is %d", collect_angle / 10);
+                                snprintf(info, 512, \
+                                         "Lidar start work,first span angle is %d", \
+                                         collect_angle / 10);
                                 cfg->callback(8, info, strlen(info) + 1);
                             }
                             break;
@@ -1002,7 +1032,9 @@ void *lidar_thread_proc_udp(void *param)
                                 gettimeofday(&tmp_tv, NULL);
                                 if (tmp_tv.tv_sec - start_tv.tv_sec > 2)
                                 {
-                                    sprintf(info, "%ld %ld span err  code:%d value:%s ", tv.tv_sec, tv.tv_usec, ret, error.c_str());
+                                    snprintf(info, 512, \
+                                             "%ld %ld span err  code:%d value:%s ", \
+                                             tv.tv_sec, tv.tv_usec, ret, error.c_str());
                                     cfg->callback(9, info, strlen(info) + 1);
                                 }
                                 error = "";
@@ -1026,7 +1058,9 @@ void *lidar_thread_proc_udp(void *param)
                                         error_num = 0;
                                     if (cfg->runscript.error_circle <= error_num)
                                     {
-                                        sprintf(info, "%s %d There are many points with a distance of 0 in the current lidar operation", cfg->runscript.connectArg, cfg->runscript.connectArg2);
+                                        snprintf(info, 512, \
+                                                 "%s %d There are many points with a distance of 0 in the current lidar operation", \
+                                                 cfg->runscript.connectArg, cfg->runscript.connectArg2);
                                         cfg->callback(9, info, strlen(info) + 1);
                                         error_num = 0;
                                     }
