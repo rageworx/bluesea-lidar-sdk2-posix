@@ -17,7 +17,6 @@ SDK_INC = pacecat*.h
 LIB_INCS = $(SRC_DIR)/$(SDK_INC)
 
 SAMPLE_DIR = samples
-CJSON_DIR = $(SRC_DIR)/third_party/cJson
 MONGO_DIR = $(SRC_DIR)/third_party/mongoose
 
 LIB_NM = pacecat2
@@ -27,22 +26,21 @@ CXXSRCS += $(SRC_DIR)/Global.cpp
 CXXSRCS += $(SRC_DIR)/LidarDataProcess.cpp
 CXXSRCS += $(SRC_DIR)/standard_interface.cpp
 
-CXXSVCSRCS += $(SRC_DIR)/service/LidarCheckService.cpp
-CXXSVCSRCS += $(SRC_DIR)/service/LidarWebService.cpp
+CXXSVCSRCS += $(SRC_DIR)/service/LidarService.cpp
 
 CSRCS += $(SRC_DIR)/uart.c
-CJSONSRCS   = $(CJSON_DIR)/cJSON.c
 CMONGOSRCS  = $(MONGO_DIR)/mongoose.c
 
 CXXFLAGS += -Wall
 CXXFLAGS += -D_WIN32
 CXXFLAGS += -g -DDEBUG
+# CXXFLAGS += -O2 -s
 CXXFLAGS += -I$(SRC_DIR)
 CXXFLAGS += -I$(SRC_DIR)/service
-CXXFLAGS += -I$(CJSON_DIR)
 CXXFLAGS += -I$(MONGO_DIR)
 
 LDFLAGS += -lws2_32
+# LDFLAGS += -s
 
 LIBOUT =  $(BIN_DIR)/$(TARGET_PKG)
 
@@ -50,7 +48,6 @@ LIBOUT =  $(BIN_DIR)/$(TARGET_PKG)
 CXXOBJS    = $(CXXSRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 CXXSVCOBJS = $(CXXSVCSRCS:$(SRC_DIR)/service/%.cpp=$(OBJ_DIR)/service/%.o)
 COBJS      = $(CSRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
-CJSONOBJS  = $(CJSONSRCS:$(CJSON_DIR)/%.c=$(OBJ_DIR)/cJSON/%.o)
 CMONGOOBJS = $(CMONGOSRCS:$(MONGO_DIR)/%.c=$(OBJ_DIR)/mongoose/%.o)
 
 .PHONY: prepare clean demo continue distclean
@@ -92,15 +89,11 @@ $(COBJS): $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@echo "Building $@ ... "
 	@$(CCC) $(CXXFLAGS) -c $< -o $@
 
-$(CJSONOBJS): $(OBJ_DIR)/cJSON/%.o: $(CJSON_DIR)/%.c
-	@echo "Building $@ ... "
-	@$(CCC) $(CXXFLAGS) -c $< -o $@
-
 $(CMONGOOBJS): $(OBJ_DIR)/mongoose/%.o: $(MONGO_DIR)/%.c
 	@echo "Building $@ ... "
 	@$(CCC) $(CXXFLAGS) -c $< -o $@
 
-$(LIBOUT): $(CXXOBJS) $(COBJS) $(CXXSVCOBJS) $(CJSONOBJS) $(CMONGOOBJS)
+$(LIBOUT): $(CXXOBJS) $(COBJS) $(CXXSVCOBJS) $(CMONGOOBJS)
 	@echo "Generating $@ ..."
 	@$(AR) -cr $@ $^
 	@$(RL) $@

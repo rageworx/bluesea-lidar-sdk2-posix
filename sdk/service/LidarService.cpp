@@ -1,104 +1,145 @@
 #include <pthread.h>
-#include "LidarCheckService.h"
+#include "LidarService.h"
 
-std::vector<DevConnInfo> m_infos;
+std::vector<DevConnInfo> deviceInfos;
 
-LidarCheckService::LidarCheckService()
+void* thread_heart(void* p)
 {
-	m_close_service = false;
-	m_thread_heart = 0;
-}
-
-LidarCheckService::~LidarCheckService()
-{
-	m_close_service = true;
-}
-
-void LidarCheckService::run()
-{
-	if (m_thread_heart != 0)
-		return;
-    
-	if ( pthread_create(&m_thread_heart, NULL, thread_heart, &m_close_service) != 0)
+    if ( p != nullptr )
     {
-        fprintf( stderr, "heartbeat thread failure.\n" );
-		return;
+        LidarService* pLS = (LidarService*)p;
+
+        int32_t ret = pLS->ThreadCallBack( pLS );
+
+        pthread_exit( &ret );
+        return nullptr;
+    }
+
+    pthread_exit( nullptr );
+    return nullptr;
+}
+
+void uptodate(DevConnInfo data)
+{
+	if (deviceInfos.size() == 0)
+	{
+		deviceInfos.push_back(data);
+		return ;
+	}
+    
+	for ( size_t i = 0; i < deviceInfos.size(); i++ )
+	{
+		//If it's the same radar, then it covers...
+		if ( ( data.type == TYPE_COM && \
+               strcmp( data.com_port, deviceInfos[i].com_port ) == 0 ) ||
+			 ( data.type != TYPE_COM && \
+               strcmp( data.conn_ip, deviceInfos[i].conn_ip ) == 0 ) )
+		{
+			memcpy( &deviceInfos[i], &data, sizeof(DevConnInfo) );
+			return;
+		}
+	}
+    
+	deviceInfos.push_back(data);
+}
+
+LidarService::LidarService()
+ : ptHeart( 0 ), bCloseService( false )
+{
+}
+
+LidarService::~LidarService()
+{
+    Stop(); 
+    
+    deviceInfos.clear();
+}
+
+bool LidarService::Run()
+{
+	if (ptHeart != 0)
+		return false;
+    
+	if ( pthread_create( &ptHeart, NULL, thread_heart, this) == 0 )
+    {
+        return true;
+    }
+    else
+    {
+        fprintf( stderr, "LidarService, thread failure.\n" );
+    }
+    
+    return false;
+}
+
+void LidarService::Stop()
+{
+    if ( bCloseService == false )
+    {
+        bCloseService = true;
+    
+        pthread_join( ptHeart, NULL );
     }
 }
 
-void LidarCheckService::stop()
+std::vector<DevConnInfo> LidarService::LidarList()
 {
-	m_close_service = true;
+	UpdateUartInfo();
+	return deviceInfos;
 }
 
-std::vector<DevConnInfo> LidarCheckService::getLidarsList()
+void LidarService::GetTime_HMS(char* data, size_t datalen)
 {
-	run();
-	uartDevInfo();
-	return m_infos;
-}
-
-void LidarCheckService::getTime_HMS(char* data, size_t datalen)
-{
-	time_t t0 = time(NULL);
+	time_t t0 = time(nullptr);
+    
 	uint32_t hh = t0 % (3600 * 24) / 3600;
 	uint32_t mm = t0 % 3600 / 60;
 	uint32_t ss = t0 % 60;
+    
 	snprintf(data, datalen, "%u-%u-%u", hh, mm, ss);
 }
 
-void LidarCheckService::clear()
+void LidarService::Clear()
 {
-	m_infos.clear();
+	deviceInfos.clear();
 }
 
-void LidarCheckService::uartDevInfo()
+void LidarService::UpdateUartInfo()
 {
 	std::vector<UARTARG>list;
 	SystemAPI::GetComList(list);
 	for (size_t i = 0; i < list.size(); i++)
 	{
 		DevConnInfo tmp;
-		memset(&tmp, 0, sizeof(DevConnInfo));
-		strcpy(tmp.com_port, list.at(i).portName);
-		tmp.com_speed = list.at(i).port;
-		strcpy(tmp.timeStr,"0");
+		memset( &tmp, 0, sizeof(DevConnInfo) );
+		strcpy( tmp.com_port, list[i].portName );
+		tmp.com_speed = list[i].port;
+		strcpy( tmp.timeStr, "0" );
 		uptodate(tmp);
 	}
 }
 
-void uptodate(DevConnInfo data)
+int32_t LidarService::State()
 {
-	if (m_infos.size() == 0)
-	{
-		m_infos.push_back(data);
-		return ;
-	}
+    if ( bCloseService == true )
+        return 1;
     
-	for (size_t i = 0; i < m_infos.size(); i++)
-	{
-		//如果是同一个雷达则覆盖
-		if ((data.type == TYPE_COM && strcmp(data.com_port,m_infos[i].com_port)==0)
-			|| (data.type != TYPE_COM && strcmp(data.conn_ip, m_infos[i].conn_ip) == 0))
-		{
-			memcpy(&m_infos[i], &data, sizeof(DevConnInfo));
-			return;
-		}
-	}
-	m_infos.push_back(data);
+    return -1;
 }
 
-void* thread_heart(void* p)
+int32_t LidarService::ThreadCallBack( void* param )
 {
-	bool closeflag = *(bool*)p;
+    if ( param != this )
+        return -1;
 
     initSocket();
+    
 	int sock = socket(AF_INET, SOCK_DGRAM, 0);
 
 	int yes = 1;
 	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char*)&yes, sizeof(yes)) < 0)
 	{
-		return NULL;
+		return -1;
 	}
 
 	sockaddr_in addr = {0,};
@@ -108,7 +149,7 @@ void* thread_heart(void* p)
 
 	int iResult = ::bind(sock, (struct sockaddr*)&addr, sizeof(addr));
 	if (iResult != 0)
-		return NULL;
+		return -1;
 
 	struct ip_mreq mreq;
 	mreq.imr_multiaddr.s_addr = inet_addr("225.225.225.225");
@@ -116,10 +157,10 @@ void* thread_heart(void* p)
 	
     if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0)
 	{
-		return NULL;
+		return -1;
 	}
     
-	while(!closeflag)
+	while( State() != 1 )
 	{
 		socklen_t sz = sizeof(addr);
 		char raw[4096] = {0,};
@@ -136,7 +177,7 @@ void* thread_heart(void* p)
 				strcpy(conn.conn_ip, inet_ntoa(addr.sin_addr));
 				conn.conn_port = ntohs(addr.sin_port);
 				memcpy(&conn.info.v101, dvi, sizeof(DevInfoV101));
-				LidarCheckService::getTime_HMS(conn.timeStr, 16);
+				LidarService::GetTime_HMS(conn.timeStr, 16);
 				uptodate(conn);
 			}
 		}
@@ -154,7 +195,7 @@ void* thread_heart(void* p)
 
 				memcpy(&conn.info.v2, dvi, sizeof(DevInfo2));
 
-				LidarCheckService::getTime_HMS(conn.timeStr,16);
+				LidarService::GetTime_HMS(conn.timeStr,16);
 				uptodate(conn);
 			}
 		}
@@ -171,7 +212,7 @@ void* thread_heart(void* p)
 				strcpy(conn.conn_ip, inet_ntoa(addr.sin_addr));
 				conn.conn_port = ntohs(addr.sin_port);
 
-				LidarCheckService::getTime_HMS(conn.timeStr,16);
+				LidarService::GetTime_HMS(conn.timeStr,16);
 				uptodate(conn);
 			}
 		}
@@ -181,6 +222,5 @@ void* thread_heart(void* p)
     
     finalSocket();
     
-    pthread_exit( NULL );
-	return NULL;
+	return 0;
 }

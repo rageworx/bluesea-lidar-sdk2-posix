@@ -63,13 +63,13 @@ extern "C"
 #define T_PACK          0x0054
 #define C_PACK          0x0043
 
-#define CHECKSERVICE    6789            /// 检测本地雷达列表端口号
+#define CHECKSERVICE    6789            /// Detect local radar list port number
 #define getbit(x,y)     ((x) >> (y)&1)
-#define setbit(x,y)     x|=(1<<y)       /// 将X的第Y位置1
-#define clrbit(x,y)     x&=~(1<<y)      /// 将X的第Y位清0
+#define setbit(x,y)     x|=(1<<y)       /// Position X at the Y-th position 1
+#define clrbit(x,y)     x&=~(1<<y)      /// Clear the Y-th bit of X to 0.
 #define UNUSED(x)       (void)(x)
 
-//CN：心跳检测包 EN：Heartbeat detection package
+// Heartbeat detection package
 struct KeepAlive {
     uint32_t world_clock;   /// 时间戳
     uint32_t mcu_hz;        /// mcu频率(内部使用)
@@ -80,9 +80,9 @@ struct KeepAlive {
 
 struct DataPoint
 {
-    float   angle;          /// CN:弧度      EN:radian
-    float   distance;       /// CN:距离(米)  EN:distance(Meter)
-    uint8_t confidence;     /// CN:强度      EN:strength
+    float   angle;          /// radian
+    float   distance;       /// distance(Meter)
+    uint8_t confidence;     /// strength
 };
 
 struct RawData
@@ -115,37 +115,38 @@ struct SpanData
 struct FrameData
 {
     uint32_t               ts[2];   /// timestamps(Second and microseconds )
-    pthread_mutex_t        datalock = PTHREAD_MUTEX_INITIALIZER;
     std::vector<DataPoint> data;
+    pthread_mutex_t        datalock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_cond_t         datacond = PTHREAD_COND_INITIALIZER;
 };
 
-//最终返回的客户使用的雷达实时数据
+//The final returned real-time radar data used by the customer
 struct UserData
 {
     DataType type;
-    int32_t idx;            /// 0表示扇区序号  1表示帧序号  超过10000000(1千万)帧回拨
+    int32_t idx;            /// 0 represents the sector number, 1 represents the frame number. More than 10,000,000 (10 million) frames require callback.
     char connectArg1[16];   /// ip/com
     int32_t connectArg2;    /// port /baud
-    //只有对应模式才有数据
+    // Data is only available for the corresponding pattern.
     SpanData spandata;
     FrameData framedata;    
 };
 
-//报警包
+//alarm package
 struct LidarMsgHdr
 {
     char sign[4];           /// must be "LMSG"
-    uint32_t proto_version; /// 协议版本，当前为0x101
-    char dev_sn[20];        /// 设备编号
-    uint32_t dev_id;        /// 设备序号
-    uint32_t timestamp;     /// 时间戳
-    uint32_t flags;         /// 消息类型
-    uint32_t events;        /// 消息内容的位组合
-    uint16_t id;            /// 消息序号
-    uint16_t extra;         ///（当前激活防区 + 设备各功能状态 + 保留）长度
-    uint32_t zone_actived;  /// 当前激活防区（范围0~F）
-    uint8_t all_states[32]; /// 设备各功能状态
-    uint32_t reserved[11];  /// 保留
+    uint32_t proto_version; /// Protocol version, currently 0x101
+    char dev_sn[20];        /// Device number
+    uint32_t dev_id;        /// Device serial number (What dev_sn for ??? )
+    uint32_t timestamp;     /// Timestamp
+    uint32_t flags;         /// Message type
+    uint32_t events;        /// Bit combination of message content
+    uint16_t id;            /// Message serial number
+    uint16_t extra;         /// Length of (current active zone + device functional states + reserved)
+    uint32_t zone_actived;  /// Current active zone (range 0~F)
+    uint8_t all_states[32]; /// Device functional states
+    uint32_t reserved[11];  /// Reserved
 };
 
 //E100系列过滤点云数据
@@ -268,26 +269,26 @@ struct RawDataHdr99 {
 //客户设置的雷达设备配置信息
 struct DevData
 {
-    int32_t RPM;    /// 转速    范围0450-1200   例如：LSRPM:0450H
-    int32_t ERR;    /// 偏差      范围-99-+99 例如:LSERR:-23H  LSERR:+23H
-    char UDP[64];   /// udp组合信息  设置雷达IP地址 子网掩码 网关 服务端口号，例如LSUDP:192.168.158.091 255.255.255.000 192.168.158.001 05000H
-    char DST[64];   /// 接收雷达信息的ip地址和端口号  LSDST:192.168.158.043 12300H
-    char NSP[32];   /// 机器类型    LSNSP:LDS-50C-S-UH
-    char UID[32];   /// 机器序号     例如LSUID:201812030001H
-    int32_t FIR;    /// 滤波圈数    (范围01~99) 例如：LSFIR:03H
-    int32_t PUL;    /// 设置电机启动脉冲数   (范围0500~4000) 例如：LSPUL:2000H
-    int32_t VER;    /// 设置版本号 例如：LSPUL:2000H
-    int32_t PNP;    /// 设置IO类型  比如设置LSNPN:1H 输出IO类型为PNP
-    int32_t SMT;    /// 数据平滑  LSSMT:1H  打开 LSSMT:0H  关闭
-    int32_t DSW;    /// 去拖点  LSDSW:1H 打开 LSDSW:0H  关闭
-    int32_t DID;    /// 设备ID   LSDID:xxxH
-    int32_t ATS;    /// 开机自动上传  LSATS:xH    1/0   打开/关闭   
-    int32_t TFX;    /// 固定上传地址  LSTFX:xH    1/0   打开/关闭   
-    //另外
-    int32_t PST;    /// 数据/报警上传类型  LSPST:xH    0:无 1:数据 2报警  3 数据+报警  
-    int32_t AF;     /// 去拖点系数
-    char set[18];   /// 需要设置的参数，1需要设置  0不设置  
-    char result[35];/// 设置是否成功  1成功   0失败
+    int32_t RPM;    /// Rotational speed Range 0450-1200 For example: LSRPM:0450H
+    int32_t ERR;    /// Deviation Range -99-+99 For example: LSERR:-23H LSERR:+23H
+    char UDP[64];   /// UDP combination information Set radar IP address Subnet mask Gateway Service port number, for example LSUDP:192.168.158.091 255.255.255.000 192.168.158.001 05000H
+    char DST[64];   /// IP address and port number for receiving radar information LSDST:192.168.158.043 12300H
+    char NSP[32];   /// Machine type LSNSP:LDS-50C-S-UH
+    char UID[32];   /// Machine serial number, e.g., LSUID:201812030001H
+    int32_t FIR;    /// Filtering cycles (range 01~99), e.g., LSFIR:03H
+    int32_t PUL;    /// Set motor start pulse count (range 0500~4000), e.g., LSPUL:2000H
+    int32_t VER;    /// Set version number, e.g., LSPUL:2000H
+    int32_t PNP;    /// Set IO type, e.g., setting LSPPN:1H to PNP output IO type
+    int32_t SMT;    /// Data smoothing, LSSMT:1H on, LSSMT:0H off
+    int32_t DSW;    /// Remove drag points, LSDSW:1H on, LSDSW:0H off
+    int32_t DID;    /// Device ID, LSDID:xxxH
+    int32_t ATS;    /// Automatic upload on startup LSATS:xH 1/0 On/Off
+    int32_t TFX;    /// Fixed upload address LSTFX:xH 1/0 On/Off
+    //In addition
+    int32_t PST;    /// Data/alarm upload type LSPST:xH 0: None 1: Data 2: Alarm 3: Data + Alarm  
+    int32_t AF;     /// De-trapping coefficient
+    char set[18];   /// Parameter to be set, 1 to be set 0 not set 
+    char result[35];/// Whether the setting was successful 1 successful 0 failed
 };
 
 struct  DevTimestamp
@@ -340,30 +341,29 @@ struct EEpromV101
     uint8_t  reserved[36];
 };
 
-//CN:UDP设置雷达参数时接收使用报文头  EN:UDP uses the header when setting lidar parameters
+// UDP uses the header when setting lidar parameters
 struct CmdHeader
 {
-    uint16_t sign; //CN:与硬件约定的标志位                       EN:Flags consistent with hardware
-    uint16_t cmd;    //CN:命令                                        EN：command
-    uint16_t sn;    //CN:随机数，发送报文和接收报文时验证是否一致   EN:Random numbers, verify consistency when sending and receiving messages
-    uint16_t len;   //CN:命令长度                                   EN:command length
+    uint16_t sign;  /// Flags consistent with hardware
+    uint16_t cmd;   /// command
+    uint16_t sn;    /// Random numbers, verify consistency when sending and receiving messages
+    uint16_t len;   /// command length
 };
 
 //串口雷达状态包(STXXXXED) 中间四个字节
 struct UartState
 {
     //byte1
-    bool unit_mm;//0 cm 1 mm
-    bool with_conf;//0 close 1 open
+    bool unit_mm;       /// 0 cm 1 mm
+    bool with_conf;     /// 0 close 1 open
     bool with_smooth;
     bool with_fitter;
     bool span_9;
     bool span_18;
     bool span_other;
-    bool resampele;//重采样
+    bool resampele;     /// 重采样
     //byte2
-
-    bool moter_turn;//0正向 1反向
+    bool moter_turn;    /// 0正向 1反向
     bool span_8;
     bool span_16;
     //byte3

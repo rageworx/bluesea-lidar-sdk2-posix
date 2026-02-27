@@ -1,26 +1,25 @@
-#connect
+#connection ---------------
 type:udp
 connectArg:192.168.158.98
 connectArg2:6543
 local_port:6668
 is_group_listener:0
 group_ip:224.0.0.99
-#data
-output_360:1
-from_zero:0
-service_port:8888
+#data ---------------------
+output_360:0
+from_zero:1
 is_open_service:1
 error_circle:3
 error_scale:0.9
-#fitter#
+#fitter -------------------
 filter_open:1
 max_range:20
 min_range:0.5
 max_range_difference:0.1
 filter_window:1
-#get
+#get ----------------------
 version:1
-#set
+#set ----------------------
 with_smooth:-1
 with_deshadow:-1
 resample_res:-1

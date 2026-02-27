@@ -1,31 +1,32 @@
 ﻿#ifndef __STANDARD_INTERFACE_H__
 #define __STANDARD_INTERFACE_H__
 
-#include "LidarDataProcess.h"
-#include "LidarCheckService.h"
-#include "error.h"
+#include <LidarDataProcess.h>
+#include <LidarService.h>
 
-#define SDKVERSION "3.2.2" // SDK版本号
+// SDK version numbers
+#define SDKVERSION "3.2.2" 
 #define SDKEXTRA "posix"
 
 class BlueSeaLidarSDK
 {
     public:
-        static BlueSeaLidarSDK *getInstance();
+        static BlueSeaLidarSDK* getInstance();
         static void deleteInstance();
 
     public:
         /************************************************
         * @functionName:  getLidar
         * @date:          2022-08-21
-        * @description:   CN:获取当前雷达的信息  EN:get current lidar info
+        * @description:   Get current lidar info
         * @Parameter:
         *                 1.ID[int,IN]          CN:雷达ID          EN:lidar ID
         *
         * @return:        RunConfig  struct
         * @others:        Null
         *************************************************/
-        RunConfig * getLidar(int ID);
+        RunConfig * GetLidarConfig(int ID);
+        
         /************************************************
         * @functionName:  addLidarByPath
         * @date:          2022-07-14
@@ -36,7 +37,8 @@ class BlueSeaLidarSDK
         * @return:        LIDAR ID
         * @others:        Null
         *************************************************/
-        int addLidarByPath(const char *cfg_file_name);
+        int AddLidarByPath(const char *cfg_file_name);
+        
         /************************************************
         * @functionName:  delLidarByID
         * @date:          2022-07-14
@@ -47,7 +49,8 @@ class BlueSeaLidarSDK
         * @return:        true/false
         * @others:        Null
         *************************************************/
-        bool delLidarByID(int ID);
+        bool DeleteLidarByID(int ID);
+        
         /************************************************
         * @functionName:  setCallBackPtr
         * @date:          2022-07-14
@@ -59,7 +62,8 @@ class BlueSeaLidarSDK
         * @return:        NUll
         * @others:        Null
         *************************************************/
-        void setCallBackPtr(int ID,printfMsg ptr);
+        void SetCallBackPtr(int ID,printfMsg ptr);
+        
         /************************************************
         * @functionName:  openDev
         * @date:          2022-03-28
@@ -70,7 +74,8 @@ class BlueSeaLidarSDK
         * @return:        true/false
         * @others:        Null
         *************************************************/
-        bool openDev(int ID);
+        bool OpenDev(int ID);
+        
         /************************************************
         * @functionName:  StopDrv
         * @date:          2022-03-28
@@ -82,6 +87,9 @@ class BlueSeaLidarSDK
         * @others:        Null
         *************************************************/
         void StopDev(int ID);
+        
+        int  GetDevState(int ID);
+        
         /************************************************
         * @functionName:  GetDevInfo
         * @date:          2023-08-21
@@ -116,7 +124,8 @@ class BlueSeaLidarSDK
          * @return:        const char*
          * @others:        Null
          *************************************************/
-        const char *getVersion();
+        const char* GetVersion();
+        
         /************************************************
          * @functionName:  ZoneSection
          * @date:          2022-10-18
@@ -127,6 +136,7 @@ class BlueSeaLidarSDK
          * @others:        防区取值范围 0-9 a-f
          *************************************************/
         bool ZoneSection(int ID, char section);
+        
         /************************************************
          * @functionName:  SetUDP
          * @date:          2023-07-31
@@ -140,6 +150,7 @@ class BlueSeaLidarSDK
          * @others:        Null
          *************************************************/
         bool SetUDP(int ID, char* ip, char* mask, char* gateway, int port);
+        
         /************************************************
          * @functionName:  SetDST
          * @date:          2023-07-31
@@ -151,6 +162,7 @@ class BlueSeaLidarSDK
          * @others:        Null
          *************************************************/
         bool SetDST(int ID, char* ip, int port);
+        
         /************************************************
          * @functionName:  SetRPM
          * @date:          2023-08-21
@@ -161,6 +173,7 @@ class BlueSeaLidarSDK
          * @others:        rpm   (300-3000)
          *************************************************/
         bool SetRPM(int ID,int RPM);
+        
         /************************************************
          * @functionName:  SetTFX
          * @date:          2023-08-21
@@ -171,6 +184,7 @@ class BlueSeaLidarSDK
          * @others:        Null
          *************************************************/
         bool SetTFX(int ID,bool tfx);
+        
         /************************************************
          * @functionName:  SetDSW
          * @date:          2023-08-21
@@ -181,6 +195,7 @@ class BlueSeaLidarSDK
          * @others:        Null
          *************************************************/
         bool SetDSW(int ID,bool dsw);
+        
         /************************************************
          * @functionName:  SetSMT
          * @date:          2023-08-21
@@ -191,16 +206,18 @@ class BlueSeaLidarSDK
          * @others:        Null
          *************************************************/
         bool SetSMT(int ID,bool smt);
+        
         /************************************************
          * @functionName:  SetPST
          * @date:          2023-08-21
          * @description:   CN:设置雷达上传方式  EN:set lidar upload way
-         * @Parameter:      1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
-         *                  2.mode[int,IN]  CN:0 无数据 1仅数据上传 2仅报警 3 数据+报警  EN:0 no data 1 only data 2 only alarm 3 data+alarm
+         * @Parameter:      1.ID [long,IN]  Lidar ID
+         *                  2.mode[int,IN]  0 no data 1 only data 2 only alarm 3 data+alarm
          * @return:        true/false
          * @others:        Null
          *************************************************/
         bool SetPST(int ID,int mode);
+        
         /************************************************
          * @functionName:  SetDID
          * @date:          2023-08-21
@@ -211,11 +228,11 @@ class BlueSeaLidarSDK
          * @others:        Repeatable, different from ID
          *************************************************/
         bool SetDID(int ID,uint32_t number);
-
+        
         /************************************************
          * @functionName:  SetNTP
          * @date:          2025-01-17
-         * @description:   CN:设置雷达ntp参数  EN:set lidar ntp property
+         * @description:   Set lidar ntp property
          * @Parameter:      1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
          *                  2.ntp_ip[char*,IN]   CN：雷达的ntp ip  EN:lidar ntp upload ip   
          *                  3.ntp_port[uint32_t,IN]   CN：雷达的ntp上传端口  EN:lidar ntp upload port     
@@ -225,25 +242,23 @@ class BlueSeaLidarSDK
          *************************************************/
         bool SetNTP(int ID,char*ntp_ip,uint16_t port,bool enable);
 
-
         /************************************************
          * @functionName:  getLidarsList
          * @date:          2023-12-13
-         * @description:   CN:获取网络款雷达的心跳包数据和当前可用的串口雷达  EN:Get heartbeat packet data for networked Lidars and currently available serial Lidars
+         * @description:   Get heartbeat packet data for networked Lidars and currently available serial Lidars
          * @return:        vector
          * @others:        The network heartbeat packet contains the received timestamp, which needs to be compared with the current timestamp to see if it is offline.
          *************************************************/
-        std::vector<DevConnInfo> getLidarsList();
+        std::vector<DevConnInfo> GetLidarsList();
+            
+    public:
         bool OpenHeartService();
         bool CloseHeartService();
 
     protected:
-        //设置雷达参数(掉电存储)
+        bool closeService(int ID);
+        // Configure radar parameters (stored after power failure)
         bool SetDevInfo(RunConfig *lidar,int length,char*cmd,int mode);
-        // 打开本地服务(web测试可视化页面)
-        bool OpenLocalService(int ID);
-        // 关闭本地服务
-        bool CloseLocalService(int ID);
 
     private:
         static BlueSeaLidarSDK *m_sdk;
@@ -253,12 +268,8 @@ class BlueSeaLidarSDK
         int m_idx;
         std::vector<RunConfig*> m_lidars;
 
-        LidarCheckService* m_checkservice;
-        bool m_checkflag;//控制心跳线程关闭
+        LidarService*           m_service;
+        bool m_checkflag;   /// Control heartbeat thread to shut down
 };
-
-void* lidar_service(void* param);
-//默认的打印函数
-void CallBackMsg(int msgtype, void *param,int length);
 
 #endif /// of __STANDARD_INTERFACE_H__

@@ -1,7 +1,9 @@
 ﻿#include "standard_interface.h"
-#include "LidarWebService.h"
+#include "error.h"
 
-BlueSeaLidarSDK *BlueSeaLidarSDK::m_sdk = new (std::nothrow)BlueSeaLidarSDK();
+// singletone instance --
+BlueSeaLidarSDK *BlueSeaLidarSDK::m_sdk = \
+    new (std::nothrow)BlueSeaLidarSDK();
 
 BlueSeaLidarSDK *BlueSeaLidarSDK ::getInstance()
 {
@@ -10,16 +12,16 @@ BlueSeaLidarSDK *BlueSeaLidarSDK ::getInstance()
 
 void BlueSeaLidarSDK::deleteInstance()
 {
-	if ( m_sdk != NULL )
+	if ( m_sdk != nullptr )
 	{
 		delete m_sdk;
-		m_sdk = NULL;
+		m_sdk = nullptr;
 	}
 }
 
 BlueSeaLidarSDK::BlueSeaLidarSDK()
  : m_idx( 0 ),
-   m_checkservice( NULL )
+   m_service( nullptr )
 {
 }
 
@@ -27,7 +29,7 @@ BlueSeaLidarSDK::~BlueSeaLidarSDK()
 {
 }
 
-RunConfig *BlueSeaLidarSDK::getLidar(int ID)
+RunConfig *BlueSeaLidarSDK::GetLidarConfig(int ID)
 {
 	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
@@ -38,7 +40,7 @@ RunConfig *BlueSeaLidarSDK::getLidar(int ID)
 	return NULL;
 }
 
-int BlueSeaLidarSDK::addLidarByPath(const char *cfg_file_name)
+int BlueSeaLidarSDK::AddLidarByPath(const char *cfg_file_name)
 {
 	RunConfig *cfg = new RunConfig;
     
@@ -60,14 +62,13 @@ int BlueSeaLidarSDK::addLidarByPath(const char *cfg_file_name)
     return 0;
 }
 
-bool BlueSeaLidarSDK::delLidarByID(int ID)
+bool BlueSeaLidarSDK::DeleteLidarByID(int ID)
 {
 	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
 		if (m_lidars[i]->ID == ID)
 		{
-			if (m_lidars[i]->state == WORK \
-                || m_lidars[i]->state == WORK_AND_WEB)
+			if ( m_lidars[i]->state == WORK )
 			{
 				m_lidars[i]->state = STOP_ALL;
 				sleep(1);
@@ -79,7 +80,7 @@ bool BlueSeaLidarSDK::delLidarByID(int ID)
 	return false;
 }
 
-void BlueSeaLidarSDK::setCallBackPtr(int ID, printfMsg ptr)
+void BlueSeaLidarSDK::SetCallBackPtr(int ID, printfMsg ptr)
 {
 	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
@@ -90,7 +91,7 @@ void BlueSeaLidarSDK::setCallBackPtr(int ID, printfMsg ptr)
 	}
 }
 
-bool BlueSeaLidarSDK::openDev(int ID)
+bool BlueSeaLidarSDK::OpenDev(int ID)
 {
 	RunConfig *lidar = NULL;
 	for (size_t i = 0; i < m_lidars.size(); i++)
@@ -134,8 +135,8 @@ bool BlueSeaLidarSDK::openDev(int ID)
 		}
 		lidar->fd = fd;
 
-		if (pthread_create(&lidar->thread_data, \
-                           NULL, lidar_thread_proc_udp, lidar) != 0)
+		if ( pthread_create(&lidar->thread_data, \
+                            NULL, lidar_thread_proc_udp, lidar) != 0 )
 			return false;
 	}
 	else
@@ -145,23 +146,16 @@ bool BlueSeaLidarSDK::openDev(int ID)
     
 	lidar->state = WORK;
 
-	// 启动web本地服务，主要用于可视化查看雷达点云是否正常，SDK单独集成则不需要
+	// Starting a local web service is primarily for visually checking 
+    // whether the radar point cloud is functioning correctly; 
+    // -- it is not necessary if the SDK is integrated separately.
 	if (lidar->runscript.is_open_service)
 	{
-		lidar->state = WORK_AND_WEB;
-		if (OpenLocalService(ID))
-        {
-			printf("Please control it through a browser and enter the default address: http://localhost: %d\n", lidar->runscript.service_port);
-        }
-		else
-		{
-			printf("Open web thread failed,port:%d\n", lidar->runscript.service_port);
-			return false;
-		}
-		// 启动雷达心跳包线程以及检测当前在线雷达数量
+		// Start the radar heartbeat packet thread 
+        // and detect the number of currently online radars.
 		OpenHeartService();
 	}
-	// 判定数据线程是否正常运行
+	// Determine if the data thread is running normally
 	size_t index = 100;
 	while (lidar->action < ONLINE && index > 0)
 	{
@@ -259,50 +253,28 @@ void BlueSeaLidarSDK::StopDev(int ID)
 	}
 }
 
-const char *BlueSeaLidarSDK::getVersion()
+int BlueSeaLidarSDK::GetDevState(int ID)
+{
+	for (size_t i = 0; i < m_lidars.size(); i++)
+	{
+		if (m_lidars[i]->ID == ID)
+		{
+			return m_lidars[i]->action;
+		}
+	}
+    
+    return OFFLINE;
+}
+
+const char *BlueSeaLidarSDK::GetVersion()
 {
 	return SDKVERSION;
 }
 
-void *lidar_service(void *param)
-{
-	int *ID = (int *)param;
-	BlueSeaLidarSDK::BlueSeaLidarSDK::getInstance()->getLidar(*ID)->webservice->run(*ID);
-	return SUCCESS;
-}
-
-// 打开本地服务
-bool BlueSeaLidarSDK::OpenLocalService(int ID)
-{
-	RunConfig *lidar = NULL;
-	for (size_t i = 0; i < m_lidars.size(); i++)
-	{
-		if (m_lidars[i]->ID == ID)
-		{
-			lidar = m_lidars[i];
-		}
-	}
-    
-	if (lidar == NULL)
-    {
-		return false;
-    }
-    
-	lidar->webservice = new LidarWebService(lidar->runscript.service_port);
-    
-    if ( lidar->webservice != NULL )
-    {
-        if (pthread_create(&lidar->thread_web, \
-                           NULL, lidar_service, &lidar->ID) == 0)
-            return true;
-    }
-
-	return false;
-}
 // 关闭本地服务
-bool BlueSeaLidarSDK::CloseLocalService(int ID)
+bool BlueSeaLidarSDK::closeService(int ID)
 {
-	RunConfig *lidar = NULL;
+	RunConfig *lidar = nullptr;
     
 	for (size_t i = 0; i < m_lidars.size(); i++)
 	{
@@ -312,14 +284,13 @@ bool BlueSeaLidarSDK::CloseLocalService(int ID)
 		}
 	}
     
-	if (lidar == NULL)
+	if (lidar == nullptr)
     {
 		return false;
     }
 
-	if (m_lidars[ID]->state == WORK_AND_WEB)
+	if ( m_lidars[ID]->state == WORK )
 	{
-		m_lidars[ID]->state = WORK;
 		return true;
 	}
 
@@ -328,15 +299,14 @@ bool BlueSeaLidarSDK::CloseLocalService(int ID)
 
 bool BlueSeaLidarSDK::OpenHeartService()
 {
-	if (m_checkservice == NULL)
+	if ( m_service == nullptr )
 	{
-		m_checkservice = new LidarCheckService();
+		m_service = new LidarService();
 	}
     
-    if ( m_checkservice != NULL )
+    if ( m_service != nullptr )
 	{
-        m_checkservice->run();
-        return true;
+        return m_service->Run();
     }
     
     return false;
@@ -344,11 +314,15 @@ bool BlueSeaLidarSDK::OpenHeartService()
 
 bool BlueSeaLidarSDK::CloseHeartService()
 {
-	m_checkservice->stop();
+    if ( m_service != nullptr )
+	{
+        m_service->Stop();
+    }
+    
 	return true;
 }
 
-// 启停雷达测距
+// Start-stop radar ranging
 bool BlueSeaLidarSDK::ControlDrv(int ID, int num, char *cmd)
 {
 	RunConfig *lidar = NULL;
@@ -381,13 +355,17 @@ bool BlueSeaLidarSDK::ControlDrv(int ID, int num, char *cmd)
     
 	if (lidar->action == FINISH)
 	{
+#ifdef DEBUG
 		printf("%s OK\n", lidar->send_cmd);
+#endif /// of DEBUG
 		return true;
 	}
     
 	else if (index == 0 && strcmp(lidar->send_cmd, "LRESTH") == 0)
 	{
+#ifdef DEBUG
 		printf("%s OK\n", lidar->send_cmd);
+#endif /// of DEBUG
 		return true;
 	}
 
@@ -411,7 +389,7 @@ bool BlueSeaLidarSDK::ZoneSection(int ID, char section)
 		return false;
     }
 
-	// 判断传入的防区是否合法
+	// Determine if the incoming defense zone is legitimate.
 	if ((section >= 48 && section <= 57) || (section >= 65 && section <= 70))
 	{
 		char tmp[12] = {0};
@@ -441,7 +419,7 @@ bool BlueSeaLidarSDK::SetUDP(int ID, char *ip, char *mask, char *gateway, int po
 
 	char result[64] = {0};
     
-	// 对传入的格式校验
+	// Validate the format of the input data.
 	if (!BaseAPI::checkAndMerge(1, ip, mask, gateway, port, result, 64))
 	{
 		return false;
@@ -456,7 +434,7 @@ bool BlueSeaLidarSDK::SetUDP(int ID, char *ip, char *mask, char *gateway, int po
     
 	lidar->action = SETPARAM;
 	
-    // 修改ip后没有返回值
+    // No return value was found after modifying the IP address.
 	return true;
 }
 
@@ -479,7 +457,7 @@ bool BlueSeaLidarSDK::SetDST(int ID, char *ip, int port)
 
 	char result[50] = {0};
     char noaddr[2] = "";
-	// 对传入的格式校验
+	// Validate the format of the input data.
 	if (!BaseAPI::checkAndMerge(0, ip, noaddr, noaddr, port, result, 50))
 	{
 		return false;
@@ -508,7 +486,7 @@ bool BlueSeaLidarSDK::SetRPM(int ID, int RPM)
 		return false;
     }
 
-	// 对传入的格式校验
+	// Validate the format of the input data.
 	if (RPM < 300 || RPM > 3000)
 	{
 		return false;
@@ -699,7 +677,7 @@ bool BlueSeaLidarSDK::SetNTP(int ID, char *ntp_ip, uint16_t port, bool enable)
 	return false;
 }
 
-std::vector<DevConnInfo> BlueSeaLidarSDK::getLidarsList()
+std::vector<DevConnInfo> BlueSeaLidarSDK::GetLidarsList()
 {
-	return m_checkservice->getLidarsList();
+	return m_service->LidarList();
 }

@@ -57,7 +57,10 @@ int32_t _write( int fd, const char* d, size_t l )
     DWORD  dWLen = (DWORD)l;
     DWORD  dLen = 0;
     HANDLE hHnd = getHandle( fd );
-    WriteFile( hHnd, d, dWLen, &dLen, NULL );
+    if ( INVALID_HANDLE_VALUE != hHnd )
+        WriteFile( hHnd, d, dWLen, &dLen, NULL );
+    else
+        dLen = write( fd, d, l );
     return (int32_t)dLen;
 #else
     return write( fd, d, l );
@@ -71,7 +74,10 @@ int32_t _read( int fd, char* d, size_t l )
     DWORD  dRLen = (DWORD)l;
     DWORD  dLen = 0;
     HANDLE hHnd = getHandle( fd );
-    ReadFile( hHnd, d, dRLen, &dLen, NULL );
+    if ( INVALID_HANDLE_VALUE != hHnd )
+        ReadFile( hHnd, d, dRLen, &dLen, NULL );
+    else
+        dLen = read( fd, d, l );
     return (int32_t)dLen;
 #else
     return read( fd, d, l );
@@ -975,17 +981,15 @@ void UserAPI::fan_data_process(const RawData& raw, std::vector<RawData>& whole_d
 int UserAPI::whole_data_process(const RawData& raw,int collect_angle, std::vector<RawData> &whole_datas,std::string &error)
 {
 	char tmp[128]={0};
+    
     whole_datas.push_back(raw);
-    if ((raw.angle + raw.span)%3600 == collect_angle)
+    
+    if ((raw.angle + raw.span)%3600 != collect_angle)
 	{
-        //int a=1;
-	}
-	else
-	{
-       // whole_datas.push_back(raw);
+        // incorrect angle ?
         return 0;
 	}
-    //printf("%d \n",whole_datas.size());
+
 	int count = 0, n = 0, angles = 0;
 
     for (std::vector<RawData>::iterator it = whole_datas.begin(); it != whole_datas.end(); ++it)
@@ -995,6 +999,7 @@ int UserAPI::whole_data_process(const RawData& raw,int collect_angle, std::vecto
         count += tmp.N;
 		n++;
 	}
+    
     if (angles != 3600)
     {
         snprintf(tmp, 128, \
@@ -1003,6 +1008,7 @@ int UserAPI::whole_data_process(const RawData& raw,int collect_angle, std::vecto
         whole_datas.clear();
         return -1;
     }
+    
     return 1;
 }
 
