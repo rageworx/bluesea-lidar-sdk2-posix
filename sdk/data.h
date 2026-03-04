@@ -116,8 +116,6 @@ struct FrameData
 {
     uint32_t               ts[2];   /// timestamps(Second and microseconds )
     std::vector<DataPoint> data;
-    pthread_mutex_t        datalock = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t         datacond = PTHREAD_COND_INITIALIZER;
 };
 
 //The final returned real-time radar data used by the customer

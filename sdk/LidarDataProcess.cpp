@@ -405,9 +405,7 @@ void *lidar_thread_proc_uart(void *param)
                         
                         if (ret == 1)
                         {
-                            pthread_mutex_lock( &cfg->userdata.framedata.datalock );
                             cfg->userdata.framedata.data.clear();
-                            pthread_mutex_unlock( &cfg->userdata.framedata.datalock );
                             for (std::size_t i = 0; i < whole_datas.size(); i++)
                             {
                                 for (int j = 0; j < whole_datas.at(i).N; j++)
@@ -441,32 +439,26 @@ void *lidar_thread_proc_uart(void *param)
                             }
                             if (cfg->runscript.separation_filter.filter_open)
                             {
-                                pthread_mutex_lock( &cfg->userdata.framedata.datalock );
                                 double angle_increment = 2 * PI / cfg->userdata.framedata.data.size();
                                 AlgorithmAPI::filter(cfg->userdata.framedata.data,
                                                      cfg->runscript.separation_filter.max_range,
                                                      cfg->runscript.separation_filter.min_range,
                                                      cfg->runscript.separation_filter.max_range_difference,
                                                      cfg->runscript.separation_filter.filter_window, angle_increment);
-                                pthread_mutex_unlock( &cfg->userdata.framedata.datalock );
                             }
                             cfg->userdata.idx++;
                             if (strcmp(cfg->runscript.type, "uart") == 0)
                             {
-                                pthread_mutex_lock( &cfg->userdata.framedata.datalock );
                                 struct timeval tv;
                                 gettimeofday(&tv, NULL);
                                 cfg->userdata.framedata.ts[0] = tv.tv_sec;
                                 cfg->userdata.framedata.ts[1] = tv.tv_usec;
-                                pthread_mutex_unlock( &cfg->userdata.framedata.datalock );
                             }
                             else if (strcmp(cfg->runscript.type, "vpc") == 0)
                             {
-                                pthread_mutex_lock( &cfg->userdata.framedata.datalock );
                                 RawData data = whole_datas.at(whole_datas.size() - 1);
                                 cfg->userdata.framedata.ts[0] = data.ts[0];
                                 cfg->userdata.framedata.ts[1] = data.ts[1];
-                                pthread_mutex_unlock( &cfg->userdata.framedata.datalock );
                             }
                             whole_datas.clear();
                             cfg->action = RUN;
@@ -1133,7 +1125,6 @@ void* lidar_thread_proc_udp(void *param)
                             
                             if (ret == 1)
                             {
-                                pthread_mutex_lock( &cfg->userdata.framedata.datalock );
                                 cfg->userdata.framedata.data.clear();
                                 
                                 for (size_t i = 0; i < whole_datas.size(); i++)
@@ -1174,7 +1165,6 @@ void* lidar_thread_proc_udp(void *param)
                                 RawData data = whole_datas[0];
                                 cfg->userdata.framedata.ts[0] = data.ts[0];
                                 cfg->userdata.framedata.ts[1] = data.ts[1];
-                                pthread_mutex_unlock( &cfg->userdata.framedata.datalock );
                                 whole_datas.clear();
                                 
                                 printf( "(debug) calling data callback ... " ); fflush( stdout );
