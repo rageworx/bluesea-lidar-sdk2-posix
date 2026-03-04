@@ -5,6 +5,7 @@ CCC=gcc
 CXX=g++
 AR=ar
 RL=ranlib
+FCG = fltk-config --use-images
 
 SRC_DIR = sdk
 INC_DIR = sdk
@@ -12,6 +13,12 @@ OBJ_DIR = obj
 BIN_DIR = bin
 EPT_DIR = $(BIN_DIR)/include
 INST_DIR = /usr/local
+
+# FLTK configs
+FLTKCFG_CXF := $(shell ${FCG} --cxxflags)
+FLTKCFG_LDF := $(shell ${FCG} --ldflags)
+FLIMGTK_CXF  = -Ilibs/fl_imgtk
+FLIMGTK_LDF  = -Llibs/fl_imgtk -lfl_imgtk
 
 SDK_INC = pacecat*.h
 LIB_INCS = $(SRC_DIR)/$(SDK_INC)
@@ -31,15 +38,19 @@ CXXSVCSRCS += $(SRC_DIR)/service/LidarService.cpp
 CSRCS += $(SRC_DIR)/uart.c
 CMONGOSRCS  = $(MONGO_DIR)/mongoose.c
 
-CXXFLAGS += -Wall
+CXXFLAGS += -Wall -fopenmp
 CXXFLAGS += -D_WIN32
-CXXFLAGS += -g -DDEBUG
+CXXFLAGS += -g3 -DDEBUG
 # CXXFLAGS += -O2 -s
 CXXFLAGS += -I$(SRC_DIR)
 CXXFLAGS += -I$(SRC_DIR)/service
 CXXFLAGS += -I$(MONGO_DIR)
+CXXFLAGS += $(FLTKCFG_CXF)
+CXXFLAGS += $(FLIMGTK_CXF)
 
 LDFLAGS += -lws2_32
+LDFLAGS += $(FLTKCFG_LDF)
+LDFLAGS += $(FLIMGTK_LDF)
 # LDFLAGS += -s
 
 LIBOUT =  $(BIN_DIR)/$(TARGET_PKG)

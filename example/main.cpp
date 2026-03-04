@@ -1,12 +1,92 @@
 ﻿#include <unistd.h>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
+#include <omp.h>
 
 #include <standard_interface.h>
+
+#include <FL/platform.H>
+#include <FL/Fl.H>
+#include <FL/Fl_Box.H>
+#include <FL/Fl_Double_Window.H>
+#include <FL/Fl_RGB_Image.H>
+
+#include <fl_imgtk.h>
+
+#define DEBUG_PRINT_DATA 0
+
+typedef struct _thread_param
+{
+    int argc;
+    char** argv;
+}thread_param;
+
+BlueSeaLidarSDK* lidarSDK = BlueSeaLidarSDK::getInstance();
+
+Fl_Double_Window*   flWindow    = nullptr;
+Fl_Box*             flRndrBox   = nullptr;
+Fl_RGB_Image*       flRndrImg   = nullptr;
+
+pthread_mutex_t     pmtxWait    = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t      pcondData   = PTHREAD_COND_INITIALIZER;
+bool                bPrtCbMsg   = false;
+
+void fl_wcb( Fl_Widget* w, void* p )
+{
+    if ( w == flWindow )
+    {
+        w->hide();
+    }
+}
+
+void clearRndrBack( bool dolock = false )
+{
+    if ( dolock == true )
+    {
+        Fl::lock();
+    }
+    
+    Fl_RGB_Image* dstImg = (Fl_RGB_Image*)flRndrBox->image();
+    
+    // clear background
+    fl_imgtk::draw_fillrect( dstImg, 0, 0, 
+                             dstImg->w(),
+                             dstImg->h(),
+                             0x223344FF );
+                             
+   // -------
+    fl_imgtk::draw_smooth_line_ex( dstImg,
+                                   0, dstImg->h() / 2,
+                                   dstImg->w(), dstImg->h() / 2,
+                                   1.5f, 0x44FF44FF );
+    // - -|- -   
+    fl_imgtk::draw_smooth_line_ex( dstImg,
+                                   dstImg->w() / 2, 0,
+                                   dstImg->w() / 2, dstImg->h(),
+                                   1.5f, 0x44FF44FF );
+                             
+    dstImg->uncache();
+    
+    if ( dolock == true )
+    {
+        Fl::unlock();
+    }
+}
 
 void CallBackMsg( int msgtype, void *param, int length )
 {
     if ( param == nullptr || length == 0 )
+    {
+        return;
+    }
+    
+    if ( bPrtCbMsg == false )
+    {
+        return;
+    }
+    
+    if ( flWindow->shown() == 0 )
     {
         return;
     }
@@ -20,27 +100,20 @@ void CallBackMsg( int msgtype, void *param, int length )
             
             if ( pointdata->type == FRAMEDATA )
             {
-                 printf( "FRAME: idx:%3d %16s %5d num:%5zu timestamp:%d.%d \r", 
+#ifdef DEBUG_STATE
+                 printf( "FRAME: idx:%3d %16s %5d num:%5zu timestamp:%d.%d \n", 
                          pointdata->idx, 
                          pointdata->connectArg1, 
                          pointdata->connectArg2, 
                          pointdata->framedata.data.size(), 
                          pointdata->framedata.ts[0], 
                          pointdata->framedata.ts[1] );
-#if 0
-                 for ( size_t i = 0; i <pointdata->framedata.data.size(); i++ )
-                 {
-                    printf( "%s\t%d \t%.5f\t%.3f\t%d\n", 
-                            pointdata->connectArg1, 
-                            pointdata->connectArg2,  
-                            pointdata->framedata.data[i].angle, 
-                            pointdata->framedata.data[i].distance, 
-                            pointdata->framedata.data[i].confidence );
-                 }
-#endif /// of 0
+#endif /// of DEBUG_STATE
+                 clearRndrBack( true );
             }
             else
             {
+#ifdef DEBUG_STATE                
                 printf( "SPAN: idx:%3d %16s %5d num:%5d timestamp:%d.%d \r", 
                         pointdata->idx, 
                         pointdata->connectArg1, 
@@ -48,18 +121,57 @@ void CallBackMsg( int msgtype, void *param, int length )
                         pointdata->spandata.data.N, 
                         pointdata->spandata.data.ts[0], 
                         pointdata->spandata.data.ts[1]);
-#if 0
+#endif /// of DEBUG_STATE
+                Fl::lock();
+                Fl_RGB_Image* dstImg = (Fl_RGB_Image*)flRndrBox->image();
+                
+                // scaling X, Y .. (acutally meaningless)
+                float cntrX = (float)dstImg->w() / 2;
+                float cntrY = (float)dstImg->h() / 2;
+                float putCX = (float)dstImg->w() * 0.3f;
+                float putCY = (float)dstImg->h() * 0.3f;
+
+                // then go !
+                #pragma omp parallel for
                 for ( size_t i = 0; i <pointdata->spandata.data.N; i++ )
                 {
-                    printf( "%s\t%d \t%.5f\t%.3f\t%d\n", 
-                            pointdata->connectArg1, 
-                            pointdata->connectArg2,  
-                            pointdata->spandata.data.points[i].angle, 
-                            pointdata->spandata.data.points[i].distance, 
-                            pointdata->spandata.data.points[i].confidence );
+                    // what is PaceCat's zero degree ????
+                    float distancef = pointdata->spandata.data.points[i].distance
+                                      * putCX;
+                    float anglef = pointdata->spandata.data.points[i].angle;
+                    
+                    float recX = cntrX + distancef * cos( anglef );
+                    float recY = cntrY + distancef * sin( anglef );
+                                        
+                    if ( recX <= 0 ) recX = dstImg->w() / 2;
+                    if ( recY <= 0 ) recY = dstImg->h() / 2;
+                    
+                    unsigned point_col = 0xFF444400;
+                    
+                    float conff = pointdata->spandata.data.points[i].confidence / 200.f;
+                    if ( conff > 1.f ) conff = 1.f;
+                    conff *= 200.f;
+                    conff /= 127.f; /// == 0x7F
+                    if ( conff > 1.f ) conff = 1.f;
+                    uint8_t conf8 = (uint8_t)(conff * 127.f);
+                    point_col |= (uint32_t)conf8;
+
+                    fl_imgtk::draw_smooth_line( dstImg,
+                                                (unsigned)recX - 2, (unsigned)recY - 2,
+                                                (unsigned)recX + 2, (unsigned)recY + 2,
+                                                point_col );
+                    fl_imgtk::draw_smooth_line( dstImg,
+                                                (unsigned)recX + 2, (unsigned)recY - 2,
+                                                (unsigned)recX - 2, (unsigned)recY + 2,
+                                                point_col );
                 }
-#endif /// of 0
-            }
+
+                dstImg->uncache();
+                flRndrBox->redraw();
+                flWindow->redraw();
+                Fl::unlock();
+                Fl::awake();
+            }            
         }break;
     
         // Real-time alarm data
@@ -223,6 +335,7 @@ void CallBackMsg( int msgtype, void *param, int length )
         case 4:
         {
             DevTimestamp *devtimestamp = (DevTimestamp *)param;
+ #if PRT_PROGRESS
             printf( "\n" );
             printf( "\nTIMESTAMP:lidar_ip:%s lidar_port:%d time:%d delay:%d\n", 
                     devtimestamp->ip, 
@@ -230,6 +343,8 @@ void CallBackMsg( int msgtype, void *param, int length )
                     devtimestamp->timestamp, 
                     devtimestamp->delay);
             fflush( stdout );
+#endif /// of PRT_PROGRESS
+            clearRndrBack( true );
         }break;
         
         // Print information (which can also be written as a log).
@@ -249,6 +364,119 @@ void CallBackMsg( int msgtype, void *param, int length )
 	}
 }
 
+int initGUI()
+{
+    Fl::lock();
+    Fl::scheme( "flat" );
+    Fl_Window::default_xclass( "fltklidardemo" );
+    Fl::set_color( FL_GRAY, 0x33333300 );
+
+    flWindow = new Fl_Double_Window( 810, 810, 
+                                     "PaceCat LiDAR LC50D-E FLTK demo | (C)2026 Raph.K." );
+    if ( flWindow != nullptr )
+    {
+        flWindow->begin();
+        flWindow->color( 0x33333300 );
+        flWindow->labelcolor( 0xEEEEEE00 );
+        
+        flRndrBox = new Fl_Box( 3, 3, 804, 804 );
+        if ( flRndrBox != nullptr )
+        {
+            flRndrBox->box( FL_NO_BOX );
+            flRndrBox->align( FL_ALIGN_INSIDE );
+            flRndrImg = fl_imgtk::makeanempty( 800, 800, 3, 0x111122FF );
+            if ( flRndrImg != nullptr )
+            {
+                flRndrBox->image( flRndrImg );
+            }
+        }
+        
+        flWindow->end();
+        flWindow->callback( fl_wcb, nullptr );
+        flWindow->show();
+        
+        return 0;
+    }
+    
+    return -1;
+}
+
+void* testRun( void* p )
+{
+    usleep( 1000000 );
+    
+    if ( lidarSDK == NULL )
+    {
+        return nullptr;
+    }
+    
+    thread_param* tp = (thread_param*)p;
+    
+	size_t lidar_sum = (size_t)tp->argc - 1;
+    int lidarID = -1;
+    
+	for (size_t i = 0; i < lidar_sum; i++)
+	{
+		const char *cfg_file_name = tp->argv[i + 1];
+		// Add the relevant radar according to the configuration file path.
+		lidarID = lidarSDK->AddLidarByPath(cfg_file_name);
+		if (!lidarID)
+		{
+			printf("config file is not exist:%s\n", cfg_file_name);
+			return nullptr;
+		}
+
+		// Callback function for passing in data information
+		lidarSDK->SetCallBackPtr(lidarID, CallBackMsg);
+
+		// Connect to the specified radar and the associated thread pool.
+		if (!lidarSDK->OpenDev(lidarID))
+		{
+			printf("open lidar failed:%d\n", lidarID);
+			return nullptr;
+		}
+        
+		printf("SDK version:%s\n", lidarSDK->GetVersion());
+	}
+    
+    printf( "\n" );
+    fflush( stdout );
+    
+    clearRndrBack();
+    
+    bPrtCbMsg = true;
+    
+    // Wait for device is closed ...
+	while( lidarSDK != nullptr )
+	{
+        /*
+        pthread_mutex_lock( &pmtxWait );
+        timespec ts;
+        clock_gettime(CLOCK_REALTIME, &ts);
+        ts.tv_sec += 1;
+        int rc = pthread_cond_timedwait( &pcondData, &pmtxWait, &ts );
+        if ( rc == 0 )
+        {
+        }
+        pthread_mutex_unlock( &pmtxWait );
+        */
+        
+        // === 
+        int state = lidarSDK->GetDevState( lidarID );
+        
+        if ( state == OFFLINE )
+        {
+            break;
+        }
+        
+        usleep( 100000 );
+        Fl::awake();
+	}
+        
+    pthread_exit( nullptr );
+    return nullptr;
+}
+
 int main(int argc, char **argv)
 {
 	if (argc < 2)
@@ -259,54 +487,18 @@ int main(int argc, char **argv)
                 argc, argv[0] );
 		return -1;
 	}
+ 
+    // init GUI ...
+    initGUI();
     
-	BlueSeaLidarSDK *lidarSDK =  BlueSeaLidarSDK::getInstance();
-    if ( lidarSDK == NULL )
+    thread_param tp { argc, argv };
+    pthread_t ptGUI;
+    if ( pthread_create( &ptGUI, nullptr, testRun, &tp ) == 0 )
     {
-        return -1;
+        return Fl::run();
     }
     
-	size_t lidar_sum = (size_t)argc - 1;
-    int lidarID = -1;
-    
-	for (size_t i = 0; i < lidar_sum; i++)
-	{
-		const char *cfg_file_name = argv[i + 1];
-		// Add the relevant radar according to the configuration file path.
-		lidarID = lidarSDK->AddLidarByPath(cfg_file_name);
-		if (!lidarID)
-		{
-			printf("config file is not exist:%s\n", cfg_file_name);
-			return -1;
-		}
+    pthread_join( ptGUI, nullptr );
 
-		// Callback function for passing in data information
-		lidarSDK->SetCallBackPtr(lidarID, CallBackMsg);
-
-		// Connect to the specified radar and the associated thread pool.
-		if (!lidarSDK->OpenDev(lidarID))
-		{
-			printf("open lidar failed:%d\n", lidarID);
-			return -2;
-		}
-        
-		printf("SDK version:%s\n", lidarSDK->GetVersion());
-	}
-    
-    // Wait for device is closed ...
-	while( lidarSDK != nullptr )
-	{
-        int state = lidarSDK->GetDevState( lidarID );
-        
-        if ( state == OFFLINE )
-        {
-            printf( "!!!!!!state changed to OFFLINE.\n" );
-            fflush( stdout );
-            break;
-        }
-        
-        usleep( 10 );
-	}
-    
 	return 0;
 }
