@@ -40,8 +40,8 @@ CMONGOSRCS  = $(MONGO_DIR)/mongoose.c
 
 CXXFLAGS += -Wall -fopenmp
 CXXFLAGS += -D_WIN32
-CXXFLAGS += -g3 -DDEBUG
-# CXXFLAGS += -O2 -s
+#CXXFLAGS += -g3 -DDEBUG
+CXXFLAGS += -O2 -s
 CXXFLAGS += -I$(SRC_DIR)
 CXXFLAGS += -I$(SRC_DIR)/service
 CXXFLAGS += -I$(MONGO_DIR)

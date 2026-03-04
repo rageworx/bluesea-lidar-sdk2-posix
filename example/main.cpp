@@ -1,5 +1,4 @@
-﻿#include <unistd.h>
-#include <cstdio>
+﻿#include <unistd.h>#include <cstdio>
 #include <cstring>
 #include <cmath>
 #include <omp.h>
@@ -14,7 +13,8 @@
 
 #include <fl_imgtk.h>
 
-#define DEBUG_PRINT_DATA 0
+#define DEBUG_PRINT_DATA    0
+#define RADF_MAX            (6.2831853072)
 
 typedef struct _thread_param
 {
@@ -65,7 +65,30 @@ void clearRndrBack( bool dolock = false )
                                    dstImg->w() / 2, 0,
                                    dstImg->w() / 2, dstImg->h(),
                                    1.5f, 0x44FF44FF );
-                             
+    #pragma omp parallel for                        
+    for( size_t cnt=0; cnt<360; cnt+=4 )
+    {
+        float distancef = (float)(dstImg->w() / 3 );
+        float linedistf = 50.f;
+        float anglef = (float)cnt * ( PI / 180.f );
+        
+        float cntrX = dstImg->w() / 2;
+        float cntrY = dstImg->h() / 2;
+        float recX[2] = {0.f,0.f};
+        float recY[2] = {0.f, 0.f};
+        recX[0] = cntrX + distancef * cos( anglef );
+        recX[1] = cntrX + ( distancef + linedistf ) * cos( anglef );    
+        recY[0] = cntrY + distancef * sin( anglef );
+        recY[1] = cntrY + ( distancef + linedistf ) * sin( anglef );
+
+        unsigned point_col = 0x33CC338F;
+        
+        fl_imgtk::draw_smooth_line( dstImg,
+                                    (unsigned)recX[0], (unsigned)recY[0],
+                                    (unsigned)recX[1], (unsigned)recY[1],
+                                    point_col );
+    }
+    
     dstImg->uncache();
     
     if ( dolock == true )
@@ -138,22 +161,20 @@ void CallBackMsg( int msgtype, void *param, int length )
                     // what is PaceCat's zero degree ????
                     float distancef = pointdata->spandata.data.points[i].distance
                                       * putCX;
-                    float anglef = pointdata->spandata.data.points[i].angle;
-                    
-                    float recX = cntrX + distancef * cos( anglef );
-                    float recY = cntrY + distancef * sin( anglef );
+                    float radf = pointdata->spandata.data.points[i].angle;
+                    float recX = cntrX + distancef * cos( radf );
+                    float recY = cntrY + distancef * sin( radf );
                                         
                     if ( recX <= 0 ) recX = dstImg->w() / 2;
                     if ( recY <= 0 ) recY = dstImg->h() / 2;
                     
                     unsigned point_col = 0xFF444400;
                     
-                    float conff = pointdata->spandata.data.points[i].confidence / 200.f;
+                    float max_conf = 400.f;
+                    float conff = pointdata->spandata.data.points[i].confidence / max_conf;
                     if ( conff > 1.f ) conff = 1.f;
-                    conff *= 200.f;
-                    conff /= 127.f; /// == 0x7F
-                    if ( conff > 1.f ) conff = 1.f;
-                    uint8_t conf8 = (uint8_t)(conff * 127.f);
+                    
+                    uint8_t conf8 = (uint8_t)(conff * 255.f);
                     point_col |= (uint32_t)conf8;
 
                     fl_imgtk::draw_smooth_line( dstImg,
