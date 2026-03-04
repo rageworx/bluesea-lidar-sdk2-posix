@@ -55,7 +55,7 @@ void clearRndrBack( bool dolock = false )
                              dstImg->h(),
                              0x223344FF );
                              
-   // -------
+    // -------
     fl_imgtk::draw_smooth_line_ex( dstImg,
                                    0, dstImg->h() / 2,
                                    dstImg->w(), dstImg->h() / 2,
@@ -70,16 +70,16 @@ void clearRndrBack( bool dolock = false )
     {
         float distancef = (float)(dstImg->w() / 3 );
         float linedistf = 50.f;
-        float anglef = (float)cnt * ( PI / 180.f );
+        float radf = (float)cnt * ( PI / 180.f );
         
         float cntrX = dstImg->w() / 2;
         float cntrY = dstImg->h() / 2;
         float recX[2] = {0.f,0.f};
         float recY[2] = {0.f, 0.f};
-        recX[0] = cntrX + distancef * cos( anglef );
-        recX[1] = cntrX + ( distancef + linedistf ) * cos( anglef );    
-        recY[0] = cntrY + distancef * sin( anglef );
-        recY[1] = cntrY + ( distancef + linedistf ) * sin( anglef );
+        recX[0] = cntrX + distancef * cos( radf );
+        recX[1] = cntrX + ( distancef + linedistf ) * cos( radf );    
+        recY[0] = cntrY + distancef * sin( radf );
+        recY[1] = cntrY + ( distancef + linedistf ) * sin( radf );
 
         unsigned point_col = 0x33CC338F;
         
