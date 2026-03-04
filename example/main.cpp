@@ -1,4 +1,5 @@
-﻿#include <unistd.h>#include <cstdio>
+﻿#include <unistd.h>
+#include <cstdio>
 #include <cstring>
 #include <cmath>
 #include <omp.h>
