@@ -1509,7 +1509,6 @@ int32_t GetDevInfoByVPC(const char* port_str, uint32_t speed)
 	uint32_t check_size = 10240;
 	int hPort = SystemAPI::open_serial_port(port_str, speed);
 	if (hPort <= 0) {
-		//MessageBox(nullptr, "open port failed", "warm", 0);
 		return false;
 	}
 	char cmd[] = "LUUIDH";
@@ -1541,12 +1540,10 @@ int32_t GetDevInfoByVPC(const char* port_str, uint32_t speed)
 		{
 			if (memcmp((char*)buf + idx, "PRODUCT SN:", 11) == 0)
 			{
-				//MessageBox(nullptr, "3", test, 0);
 				bOK = 2;
 			}
 			else if (memcmp((char*)buf + idx, "LMSG", 4) == 0)
 			{
-				//MessageBox(nullptr, "4", test, 0);
 				bOK = 3;
 			}
 		}
