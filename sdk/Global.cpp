@@ -58,7 +58,7 @@ int32_t _write( int fd, const char* d, size_t l )
     DWORD  dLen = 0;
     HANDLE hHnd = getHandle( fd );
     if ( INVALID_HANDLE_VALUE != hHnd )
-        WriteFile( hHnd, d, dWLen, &dLen, nullptr );
+        WriteFile( hHnd, d, dWLen, &dLen, NULL );
     else
         dLen = write( fd, d, l );
     return (int32_t)dLen;
@@ -75,7 +75,7 @@ int32_t _read( int fd, char* d, size_t l )
     DWORD  dLen = 0;
     HANDLE hHnd = getHandle( fd );
     if ( INVALID_HANDLE_VALUE != hHnd )
-        ReadFile( hHnd, d, dRLen, &dLen, nullptr );
+        ReadFile( hHnd, d, dRLen, &dLen, NULL );
     else
         dLen = read( fd, d, l );
     return (int32_t)dLen;
@@ -214,14 +214,14 @@ int32_t AlgorithmAPI::MedianFilter(UserData* scan_in, \
 {
     int32_t* dists = new int32_t[scan_in->framedata.data.size()];
 
-    if ( dists == nullptr )
+    if ( dists == NULL )
     {
         return -1;
     }
     
 	int32_t* buf = new int32_t[param.window * 2 + 1];
     
-    if ( buf == nullptr )
+    if ( buf == NULL )
     {
         delete[] dists;
         return -1;
@@ -265,7 +265,7 @@ int32_t AlgorithmAPI::MedianFilter(UserData* scan_in, \
 void DecTimestamp(uint32_t ts, uint32_t* ts2)
 {
 	timeval tv;
-	gettimeofday(&tv, nullptr);
+	gettimeofday(&tv, NULL);
 
 	uint32_t sec = tv.tv_sec % 3600;
 	if (sec < 5 && ts / 1000 > 3595)
@@ -288,12 +288,12 @@ static bool GetData0xC7(const RawDataHdr7& hdr, uint8_t* pdat, \
 
 	FanSegment_C7* fan_seg = GetFanSegment(hdr, pdat, with_chk);
     
-	if ( fan_seg == nullptr )
+	if ( fan_seg == NULL )
     {
-        return false;
+        return NULL;
     }
 
-	if (*last_fan_seg != nullptr)
+	if (*last_fan_seg != NULL)
 	{
 		FanSegment_C7* seg = (*last_fan_seg);
 
@@ -319,11 +319,11 @@ static bool GetData0xC7(const RawDataHdr7& hdr, uint8_t* pdat, \
                     snprintf( result, result_len, "drop duplicated segment" );
 
 					delete fan_seg;
-					fan_seg = nullptr;
+					fan_seg = NULL;
 					break;
 				}
                 
-				if (seg->next == nullptr) 
+				if (seg->next == NULL) 
                 {
 					seg->next = fan_seg;
 					break;
@@ -334,7 +334,7 @@ static bool GetData0xC7(const RawDataHdr7& hdr, uint8_t* pdat, \
 		}
 	}
 
-	if (*last_fan_seg == nullptr && fan_seg != nullptr)
+	if (*last_fan_seg == NULL && fan_seg != NULL)
 	{
 		*last_fan_seg = fan_seg;
 	}
@@ -379,12 +379,12 @@ bool GetData0xAA( const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk, \
 
 	FanSegment_AA* fan_seg = GetFanSegment(hdr, pdat, with_chk);
 
-	if ( fan_seg == nullptr )
+	if ( fan_seg == NULL )
     {
         return false;
     }
 
-	if (*last_fan_seg != nullptr)
+	if (*last_fan_seg != NULL)
 	{
 		FanSegment_AA* seg = (*last_fan_seg);
 
@@ -412,11 +412,11 @@ bool GetData0xAA( const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk, \
                               "drop duplicated segment" );
 
 					delete fan_seg;
-					fan_seg = nullptr;
+					fan_seg = NULL;
 					break;
 				}
                 
-				if ( seg->next == nullptr ) 
+				if ( seg->next == NULL ) 
                 {
 					seg->next = fan_seg;
 					break;
@@ -427,7 +427,7 @@ bool GetData0xAA( const RawDataHdrAA& hdr, uint8_t* pdat, bool with_chk, \
 		}
 	}
 
-	if (*last_fan_seg == nullptr && fan_seg != nullptr)
+	if (*last_fan_seg == NULL && fan_seg != NULL)
 	{
 		*last_fan_seg = fan_seg;
 	}
@@ -757,14 +757,14 @@ int32_t ParseAPI::parse_data_x( uint32_t len, uint8_t* buf, \
 			memcpy(&hdr99, buf + idx, HDR99_SIZE);
 			if (hdr99.total == 0)
 			{
-				PRTSTDERR( "bad num hdr99 \n" );
+				fprintf( stderr, "bad num hdr99 \n" );
 				idx += 2;
 				continue;
 			}
 			int hdr99_span = hdr99.N * 3600 / hdr99.total;
 			if (hdr99_span % 90 != 0)
 			{
-				PRTSTDERR( "bad angle %d \n", hdr99_span );
+				fprintf( stderr, "bad angle %d \n", hdr99_span );
 				idx += 2;
 				continue;
 			}
@@ -774,7 +774,7 @@ int32_t ParseAPI::parse_data_x( uint32_t len, uint8_t* buf, \
         {
 			if (hdr.angle % 90 != 0) 
             {
-				PRTSTDERR( "bad angle %d \n", hdr.angle );
+				fprintf( stderr, "bad angle %d \n", hdr.angle );
 				idx += 2;
 				continue;
 			}
@@ -782,7 +782,7 @@ int32_t ParseAPI::parse_data_x( uint32_t len, uint8_t* buf, \
 
         if (hdr.N > MAX_POINTS)
 		{
-			PRTSTDERR( "points number %d seem not correct\n", hdr.N );
+			fprintf( stderr, "points number %d seem not correct\n", hdr.N );
 			idx += 2;
 			continue;
 		}
@@ -1017,7 +1017,7 @@ bool judgepcIPAddrIsValid(const char* pcIPAddr)
 	int iDots = 0; /* 字符.的个数 */
 	int iSetions = 0; /* pcIPAddr 每一部分总和（0-255）*/
 
-	if (nullptr == pcIPAddr || *pcIPAddr == '.') { /*排除输入参数为nullptr, 或者一个字符为'.'的字符串*/
+	if (NULL == pcIPAddr || *pcIPAddr == '.') { /*排除输入参数为NULL, 或者一个字符为'.'的字符串*/
 		return false;
 	}
 
@@ -1217,6 +1217,7 @@ int UserAPI::autoGetFirstAngle(const RawData &raw, bool from_zero, std::vector<R
         {
             //说明是连续的扇区
             raws.push_back(raw);
+
         }
     }
     else
@@ -1393,7 +1394,7 @@ void gettimeofday(timeval* tv, void*)
 	SYSTEMTIME st;
 	GetLocalTime(&st);
 
-	tv->tv_sec = time(nullptr);
+	tv->tv_sec = time(NULL);
 	tv->tv_usec = st.wMilliseconds;
 }
 #endif
@@ -1509,6 +1510,7 @@ int32_t GetDevInfoByVPC(const char* port_str, uint32_t speed)
 	uint32_t check_size = 10240;
 	int hPort = SystemAPI::open_serial_port(port_str, speed);
 	if (hPort <= 0) {
+		//MessageBox(NULL, "open port failed", "warm", 0);
 		return false;
 	}
 	char cmd[] = "LUUIDH";
@@ -1540,10 +1542,12 @@ int32_t GetDevInfoByVPC(const char* port_str, uint32_t speed)
 		{
 			if (memcmp((char*)buf + idx, "PRODUCT SN:", 11) == 0)
 			{
+				//MessageBox(NULL, "3", test, 0);
 				bOK = 2;
 			}
 			else if (memcmp((char*)buf + idx, "LMSG", 4) == 0)
 			{
+				//MessageBox(NULL, "4", test, 0);
 				bOK = 3;
 			}
 		}
@@ -1576,9 +1580,7 @@ int32_t SystemAPI::open_socket_port(int32_t localhost)
 	int rt = ::bind(fd_udp, (struct sockaddr*)&addr, sizeof(addr));
 	if (rt != 0)
 	{
-#ifdef DEBUG
 		printf("\033[1;31m----> bind port %d failed.\033[0m\n", localhost);
-#endif /// of DEBUG
 		return -2;
 	}
 
@@ -1627,7 +1629,7 @@ std::vector<std::string> SystemAPI::GetComPort()
 		{
 			dwLong = dwSize = sizeof(portName);
 			//枚举串口
-			if (ERROR_NO_MORE_ITEMS == ::RegEnumValue(hKey, i, portName, &dwLong, nullptr, nullptr, (PUCHAR)commName, &dwSize))
+			if (ERROR_NO_MORE_ITEMS == ::RegEnumValue(hKey, i, portName, &dwLong, NULL, NULL, (PUCHAR)commName, &dwSize))
 			{
 				break;
 			}
@@ -1647,13 +1649,13 @@ std::vector<std::string> SystemAPI::GetComPort()
 	struct dirent* dp;
 
 	dirp = opendir(path.c_str());
-	if (dirp == nullptr) 
+	if (dirp == NULL) 
     {
 		printf("opendir %s failed\n", path.c_str());
 		return comName;
 	}
 
-	while ((dp = readdir(dirp)) != nullptr) {
+	while ((dp = readdir(dirp)) != NULL) {
 		std::string curpath(path);
 		if (path.at(path.length()-1) != '/') {
 			curpath += std::string("/") += dp->d_name;
@@ -1687,13 +1689,14 @@ int32_t Open_serial_port(const char* name, uint16_t port)
     CreateFileA(path,
 		GENERIC_READ | GENERIC_WRITE,		/// Access (read-write) mode
 		FILE_SHARE_READ | FILE_SHARE_WRITE, /// Share mode
-		nullptr,								/// Pointer to the security attribute
+		NULL,								/// Pointer to the security attribute
 		OPEN_EXISTING,					  /// How to open the serial port
 		0,								  /// Port attributes
-		nullptr);							  /// Handle to port with attribute
+		NULL);							  /// Handle to port with attribute
 
-	if (hPort == nullptr || hPort == INVALID_HANDLE_VALUE)
+	if (hPort == NULL || hPort == INVALID_HANDLE_VALUE)
 	{
+		// MessageBox(0, "can not open port", name, MB_OK);
 		return 0;
 	}
 
@@ -1716,7 +1719,7 @@ int32_t Open_serial_port(const char* name, uint16_t port)
 	PortDCB.fOutX = FALSE;			  // No XON/XOFF out flow control
 	PortDCB.fInX = FALSE;			  // No XON/XOFF in flow control
 	PortDCB.fErrorChar = FALSE;		  // Disable error replacement
-	PortDCB.fNull = FALSE;			  // Disable nullptr stripping
+	PortDCB.fNull = FALSE;			  // Disable null stripping
 	PortDCB.fRtsControl = RTS_CONTROL_ENABLE;
 	// RTS flow control
 	PortDCB.fAbortOnError = FALSE; // Do not abort reads/writes on
@@ -1852,7 +1855,7 @@ void CommunicationAPI::send_cmd_vpc(int32_t hCom, uint32_t mode, uint32_t sn, \
 {
 	char* buffer = new char[ sizeof( CmdHeader ) + len ];
     
-    if ( buffer != nullptr )
+    if ( buffer != NULL )
     {    
         CmdHeader* hdr = (CmdHeader*)buffer;
         
@@ -1937,7 +1940,7 @@ bool CommunicationAPI::uart_talk(int fd, size_t n, const char* cmd, \
                     fetch[nfetch] = 0;
                 }
                 else 
-                if(strstr(cmd, "LSRPM")!=nullptr)
+                if(strstr(cmd, "LSRPM")!=NULL)
                 {
                     if(buf[i + nhdr+1]=='O'&&buf[i + nhdr+2]=='K')
                     {
@@ -1987,7 +1990,7 @@ bool CommunicationAPI::uart_talk(int fd, size_t n, const char* cmd, \
         }
     }
 
-    PRTSTDERR( "read %d bytes, not found %s\n", nr, hdr_str);
+    fprintf( stderr, "read %d bytes, not found %s\n", nr, hdr_str);
     
     return false;
 }
@@ -2002,7 +2005,7 @@ bool CommunicationAPI::vpc_talk(int hcom, int32_t mode, int16_t sn, \
 
 	char* buffer = new char[ sizeof(CmdHeader) + len ];
 
-    if ( buffer == nullptr )
+    if ( buffer == NULL )
     {
         return false;
     }
@@ -2084,7 +2087,7 @@ bool CommunicationAPI::vpc_talk(int hcom, int32_t mode, int16_t sn, \
 		}
 	}
     
-	PRTSTDERR( "read %d bytes, not found %s\n", nr, cmd );
+	fprintf( stderr, "read %d bytes, not found %s\n", nr, cmd );
 	return false;
 }
 
@@ -2093,9 +2096,9 @@ void CommunicationAPI::send_cmd_udp(int fd_udp, const char* dev_ip, \
                                     int32_t sn, size_t len, \
                                     const void* snd_buf)
 {
-	char* buffer = new char[ sizeof(CmdHeader) + len + 4 ];
+	char* buffer = new char[ sizeof(CmdHeader) + len ];
     
-    if ( buffer == nullptr )
+    if ( buffer == NULL )
     {
         return;
     }
@@ -2121,10 +2124,7 @@ void CommunicationAPI::send_cmd_udp(int fd_udp, const char* dev_ip, \
 
 	int len2 = len + sizeof(CmdHeader) + 4;
 
-	size_t retsz = sendto(fd_udp, buffer, len2, 0, \
-                          (struct sockaddr*)&to, sizeof(struct sockaddr));
-    delete[] buffer;
-    buffer = nullptr;
+	sendto(fd_udp, buffer, len2, 0, (struct sockaddr*)&to, sizeof(struct sockaddr));
 }
 
 bool CommunicationAPI::udp_talk_GS_PACK(int fd_udp, const char* ip, \
@@ -2144,7 +2144,7 @@ bool CommunicationAPI::udp_talk_GS_PACK(int fd_udp, const char* ip, \
 		FD_SET(fd_udp, &fds);
 
 		struct timeval to = { 1,0 };
-		int ret = select(fd_udp + 1, &fds, nullptr, nullptr, &to);
+		int ret = select(fd_udp + 1, &fds, NULL, NULL, &to);
 
 		if (ret <= 0)
 		{
@@ -2195,7 +2195,7 @@ bool CommunicationAPI::udp_talk_S_PACK(int fd_udp, const char* ip, \
 		FD_SET(fd_udp, &fds);
 
 		struct timeval to = { 3, 0 };
-		int ret = select(fd_udp + 1, &fds, nullptr, nullptr, &to);
+		int ret = select(fd_udp + 1, &fds, NULL, NULL, &to);
 		if (ret <= 0)
 		{
 			return false;
@@ -2222,7 +2222,7 @@ bool CommunicationAPI::udp_talk_S_PACK(int fd_udp, const char* ip, \
 		}
 	}
 
-	PRTSTDERR( "read %d packets, not response\n", nr );
+	fprintf( stderr, "read %d packets, not response\n", nr );
 	return false;
 }
 
@@ -2239,21 +2239,21 @@ bool CommunicationAPI::udp_talk_C_PACK(int fd_udp, const char* lidar_ip, \
 	uint16_t sn = rand() % 0xFFFF;
 	CommunicationAPI::send_cmd_udp(fd_udp, lidar_ip, lidar_port, 0x0043, sn, n, cmd);
 
-	time_t t0 = time(nullptr);
+	time_t t0 = time(NULL);
 	size_t ntry = 0;
     
-	while (time(nullptr) < t0 + 3 && ntry < 1000)
+	while (time(NULL) < t0 + 3 && ntry < 1000)
 	{
 		fd_set fds;
 		FD_ZERO(&fds);
 		FD_SET(fd_udp, &fds);
 
 		struct timeval to = { 1, 0 };
-		int ret = select(fd_udp + 1, &fds, nullptr, nullptr, &to);
+		int ret = select(fd_udp + 1, &fds, NULL, NULL, &to);
 
 		if (ret < 0)
 		{
-			PRTSTDERR( "select error\n" );
+			fprintf( stderr, "select error\n" );
 			return false;
 		}
 		if (ret == 0)
@@ -2293,7 +2293,7 @@ bool CommunicationAPI::udp_talk_C_PACK(int fd_udp, const char* lidar_ip, \
 		}
 	}
 	
-    PRTSTDERR( "read %zu packets, not response  \n", ntry );
+    fprintf( stderr, "read %zu packets, not response  \n", ntry );
 	return false;
 }
 
@@ -2306,11 +2306,11 @@ static FanSegment_C7* GetFanSegment(const RawDataHdr7& hdr, uint8_t* pdat, bool 
 	if (!fan_seg) 
     {
 		printf("out of memory\n");
-		return nullptr;
+		return NULL;
 	}
     
 	fan_seg->hdr = hdr;
-	fan_seg->next = nullptr;
+	fan_seg->next = NULL;
 
 	uint16_t sum = 0;
 
@@ -2342,7 +2342,7 @@ static FanSegment_C7* GetFanSegment(const RawDataHdr7& hdr, uint8_t* pdat, bool 
     {
 		fprintf(stderr, "checksum error\n");
 		delete fan_seg;
-		return nullptr;
+		return NULL;
 	}
 
 	return fan_seg;
@@ -2353,14 +2353,14 @@ static FanSegment_AA* GetFanSegment(const RawDataHdrAA& hdr, uint8_t* pdat, bool
 	UNUSED(with_chk);
     
 	FanSegment_AA* fan_seg = new FanSegment_AA;
-	if ( fan_seg == nullptr ) 
+	if ( fan_seg == NULL ) 
     {
 		fprintf(stderr,"memory allocation failure\n");
-		return nullptr;
+		return NULL;
 	}
     
 	fan_seg->hdr = hdr;
-	fan_seg->next = nullptr;
+	fan_seg->next = NULL;
 
 	uint16_t sum = 0;
     uint16_t* pchk = (uint16_t*)pdat;
@@ -2392,7 +2392,7 @@ static FanSegment_AA* GetFanSegment(const RawDataHdrAA& hdr, uint8_t* pdat, bool
     {
 		fprintf(stderr, "checksum error\n");
 		delete fan_seg;
-		return nullptr;
+		return NULL;
 	}
 
 	return fan_seg;
@@ -2543,7 +2543,7 @@ bool AlgorithmAPI::filter(std::vector<DataPoint> &output_scan, \
     /*Check if range size is big enough to use7 the filter window */
     if (output_scan.size() <= (size_t)filter_window + 1)
     {
-        PRTSTDERR( 
+        fprintf( stderr, 
                  "Scan ranges size is too small: size = %zu", 
                  output_scan.size());
         return false;

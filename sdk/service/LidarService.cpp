@@ -215,7 +215,7 @@ int32_t LidarService::ThreadCallBack( void* param )
 				LidarService::GetTime_HMS(conn.timeStr,16);
 				uptodate(conn);
 			}
-		}        
+		}
 	}
     
 	SystemAPI::closefd(sock,true);

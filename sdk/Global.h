@@ -125,9 +125,4 @@ bool judgepcIPAddrIsValid(const char* pcIPAddr);
 void initSocket();
 void finalSocket();
 
-#ifndef PRTSTDERR
-    #define PRTSTDERR(...) \
-            fprintf(stderr,__VA_ARGS__); fflush(stderr)
-#endif /// of PRTSTDERR
-
 #endif /// of __PACECATGLOBAL_H__
