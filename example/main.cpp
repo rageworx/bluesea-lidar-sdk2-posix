@@ -16,6 +16,7 @@
 
 #define DEBUG_PRINT_DATA    0
 #define RADF_MAX            (6.2831853072)
+#define RADF_FIX_90DGR      (1.570796)
 
 typedef struct _thread_param
 {
@@ -162,30 +163,54 @@ void CallBackMsg( int msgtype, void *param, int length )
                     // what is PaceCat's zero degree ????
                     float distancef = pointdata->spandata.data.points[i].distance
                                       * putCX;
-                    float radf = pointdata->spandata.data.points[i].angle;
+                    float radf = pointdata->spandata.data.points[i].angle \
+                                 - RADF_FIX_90DGR;
                     float recX = cntrX + distancef * cos( radf );
                     float recY = cntrY + distancef * sin( radf );
+                    float farL = 30.f;
+                    float farX = recX + farL * cos( radf );
+                    float farY = recY + farL * sin( radf );
+                    float endL = std::max( dstImg->w(), dstImg->h() ) - distancef;
+                    float endX = farX + endL * cos( radf );
+                    float endY = farY + endL * sin( radf );
                                         
                     if ( recX <= 0 ) recX = dstImg->w() / 2;
                     if ( recY <= 0 ) recY = dstImg->h() / 2;
                     
                     unsigned point_col = 0xFF444400;
+                    unsigned dispo_col = 0x77111100;
                     
                     float max_conf = 400.f;
                     float conff = pointdata->spandata.data.points[i].confidence / max_conf;
                     if ( conff > 1.f ) conff = 1.f;
                     
-                    uint8_t conf8 = (uint8_t)(conff * 255.f);
+                    uint8_t conf8 = (uint8_t)(conff * 128.f);
                     point_col |= (uint32_t)conf8;
+                    dispo_col |= (uint32_t)(conf8 * 0.75f);
+                    
+                    // filter out errors...
+                    bool bIgnore = false;
+                    float coThrs = 5.f;
+                    float cfThrs = 0.025f;
+                    
+                    if ( recX == cntrX || recY == cntrY || conff < cfThrs )
+                    {
+                        bIgnore = true;
+                    }
 
-                    fl_imgtk::draw_smooth_line( dstImg,
-                                                (unsigned)recX - 2, (unsigned)recY - 2,
-                                                (unsigned)recX + 2, (unsigned)recY + 2,
-                                                point_col );
-                    fl_imgtk::draw_smooth_line( dstImg,
-                                                (unsigned)recX + 2, (unsigned)recY - 2,
-                                                (unsigned)recX - 2, (unsigned)recY + 2,
-                                                point_col );
+                    if ( bIgnore == false )
+                    {
+                        fl_imgtk::draw_smooth_line_ex( dstImg,
+                                                      (unsigned)recX, (unsigned)recY,
+                                                      (unsigned)farX, (unsigned)farY,
+                                                      3.2f, 
+                                                      point_col );
+                        fl_imgtk::draw_smooth_line_ex( dstImg,
+                                                      (unsigned)farX, (unsigned)farY,
+                                                      (unsigned)endX, (unsigned)endY,
+                                                      3.2f, 
+                                                      dispo_col );
+                    }
                 }
 
                 dstImg->uncache();
