@@ -92,10 +92,10 @@ struct RawData
     uint16_t angle;     /// The starting angle of the current sector *10
     uint16_t span;      /// The total angle of the sector (sector end angle - sector start angle)
     uint16_t fbase;     /// Sector start offset（NULL）
-    uint16_t first;     /// first point32_t angle（NULL）
-    uint16_t last;      /// last point32_t angle（NULL）
+    uint16_t first;     /// first angle（NULL）
+    uint16_t last;      /// last angle（NULL）
     uint16_t fend;      /// Sector end offset（NULL）
-    uint32_t flags;     /// 消息类型
+    uint32_t flags;     /// Message Type
 
     DataPoint points[MAX_POINTS];   /// The specific information of the scanning point32_t (the specific initialization number is determined by N)
     uint32_t ts[2];                 /// timestamps(Second and millisecond )
@@ -116,8 +116,6 @@ struct FrameData
 {
     uint32_t               ts[2];   /// timestamps(Second and microseconds )
     std::vector<DataPoint> data;
-    pthread_mutex_t        datalock = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t         datacond = PTHREAD_COND_INITIALIZER;
 };
 
 //The final returned real-time radar data used by the customer
