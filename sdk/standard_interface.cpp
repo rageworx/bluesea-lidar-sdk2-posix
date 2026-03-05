@@ -227,13 +227,17 @@ bool BlueSeaLidarSDK::SetDevInfo(RunConfig *lidar, int num, char *cmd, int mode)
 	{
 		if (strcmp(lidar->recv_cmd, "OK") == 0)
 		{
+#ifdef DEBUG
 			printf("%s OK\n", lidar->send_cmd);
+#endif /// of DEBUG
 			return true;
 		}
 		else 
         if (strcmp(lidar->recv_cmd, "NG") == 0)
 		{
+#ifdef DEBUG
 			printf("%s NG\n", lidar->send_cmd);
+#endif /// of DEBUG
 			return false;
 		}
 	}
@@ -658,7 +662,7 @@ bool BlueSeaLidarSDK::SetNTP(int ID, char *ntp_ip, uint16_t port, bool enable)
     
 	if (index != 3)
 	{
-		fprintf(stderr, "ntp ip set error!");
+		PRTSTDERR( "ntp ip set error!");
 		return false;
 	}
 	else
