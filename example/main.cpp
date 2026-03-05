@@ -153,25 +153,24 @@ void CallBackMsg( int msgtype, void *param, int length )
                 // scaling X, Y .. (acutally meaningless)
                 float cntrX = (float)dstImg->w() / 2;
                 float cntrY = (float)dstImg->h() / 2;
-                float putCX = (float)dstImg->w() * 0.3f;
-                float putCY = (float)dstImg->h() * 0.3f;
-
+                float putCW = (float)dstImg->w() * 0.3f;
+                
                 // then go !
                 #pragma omp parallel for
                 for ( size_t i = 0; i <pointdata->spandata.data.N; i++ )
                 {
-                    // what is PaceCat's zero degree ????
+                    float scalef = 0.8f;
                     float distancef = pointdata->spandata.data.points[i].distance
-                                      * putCX;
+                                      * putCW * scalef;
                     float radf = pointdata->spandata.data.points[i].angle \
                                  - RADF_FIX_90DGR;
-                    float recX = cntrX + distancef * cos( radf );
+                    float recX = cntrX + distancef * -cos( radf );
                     float recY = cntrY + distancef * sin( radf );
                     float farL = 30.f;
-                    float farX = recX + farL * cos( radf );
+                    float farX = recX + farL * -cos( radf );
                     float farY = recY + farL * sin( radf );
                     float endL = std::max( dstImg->w(), dstImg->h() ) - distancef;
-                    float endX = farX + endL * cos( radf );
+                    float endX = farX + endL * -cos( radf );
                     float endY = farY + endL * sin( radf );
                                         
                     if ( recX <= 0 ) recX = dstImg->w() / 2;
@@ -186,11 +185,10 @@ void CallBackMsg( int msgtype, void *param, int length )
                     
                     uint8_t conf8 = (uint8_t)(conff * 128.f);
                     point_col |= (uint32_t)conf8;
-                    dispo_col |= (uint32_t)(conf8 * 0.75f);
+                    dispo_col |= (uint32_t)((float)conf8 * 0.5f);
                     
                     // filter out errors...
                     bool bIgnore = false;
-                    float coThrs = 5.f;
                     float cfThrs = 0.025f;
                     
                     if ( recX == cntrX || recY == cntrY || conff < cfThrs )
@@ -381,8 +379,8 @@ void CallBackMsg( int msgtype, void *param, int length )
         //  for serial versions, the timestamp received by the local machine).
         case 4:
         {
-            DevTimestamp *devtimestamp = (DevTimestamp *)param;
  #if PRT_PROGRESS
+            DevTimestamp *devtimestamp = (DevTimestamp *)param;
             printf( "\n" );
             printf( "\nTIMESTAMP:lidar_ip:%s lidar_port:%d time:%d delay:%d\n", 
                     devtimestamp->ip, 
@@ -435,6 +433,7 @@ int initGUI()
             if ( flRndrImg != nullptr )
             {
                 flRndrBox->image( flRndrImg );
+                clearRndrBack();
             }
         }
         
