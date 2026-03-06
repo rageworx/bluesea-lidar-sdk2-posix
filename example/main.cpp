@@ -29,6 +29,7 @@ BlueSeaLidarSDK* lidarSDK = BlueSeaLidarSDK::getInstance();
 Fl_Double_Window*   flWindow    = nullptr;
 Fl_Box*             flRndrBox   = nullptr;
 Fl_RGB_Image*       flRndrImg   = nullptr;
+Fl_Box*             flStatBox   = nullptr;
 
 pthread_mutex_t     pmtxWait    = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t      pcondData   = PTHREAD_COND_INITIALIZER;
@@ -63,7 +64,7 @@ void clearRndrBack( bool dolock = false )
                                    dstImg->w(), dstImg->h() / 2,
                                    0.5f, 0x44FF446F );
     #pragma omp parallel for
-    for( size_t cnt=dstImg->w()/2+5; cnt<dstImg->w(); cnt+=5 )
+    for( size_t cnt=size_t(dstImg->w()/2)+5; cnt<(size_t)dstImg->w(); cnt+=5 )
     {
         fl_imgtk::draw_smooth_line_ex( dstImg,
                                        cnt, dstImg->h() / 2,
@@ -77,7 +78,7 @@ void clearRndrBack( bool dolock = false )
                                    dstImg->w() / 2, dstImg->h(),
                                    0.5f, 0x44FF446F );
     #pragma omp parallel for
-    for( size_t cnt=0; cnt<dstImg->h()/2; cnt+=5 )
+    for( size_t cnt=0; cnt<(size_t)(dstImg->h()/2); cnt+=5 )
     {
         fl_imgtk::draw_smooth_line_ex( dstImg,
                                        dstImg->w() / 2, cnt,
@@ -165,16 +166,21 @@ void CallBackMsg( int msgtype, void *param, int length )
             }
             else
             {
-#ifdef DEBUG_STATE                
-                printf( "SPAN: idx:%3d %16s %5d num:%5d timestamp:%d.%d \r", 
-                        pointdata->idx, 
-                        pointdata->connectArg1, 
-                        pointdata->connectArg2, 
-                        pointdata->spandata.data.N, 
-                        pointdata->spandata.data.ts[0], 
-                        pointdata->spandata.data.ts[1]);
-#endif /// of DEBUG_STATE
+                char tmpStr[160] = {0};
+                snprintf( tmpStr, 160, 
+                          "SPAN: idx=%13d | ip=%16s | port=%5d\n"
+                          "      num=%5d | timestamp=%20d.%d", 
+                          pointdata->idx, 
+                          pointdata->connectArg1, 
+                          pointdata->connectArg2, 
+                          pointdata->spandata.data.N, 
+                          pointdata->spandata.data.ts[0], 
+                          pointdata->spandata.data.ts[1]);
+
                 Fl::lock();
+                flStatBox->copy_label( tmpStr );
+                flStatBox->redraw();
+                
                 Fl_RGB_Image* dstImg = (Fl_RGB_Image*)flRndrBox->image();
                 
                 // scaling X, Y .. (acutally meaningless)
@@ -301,9 +307,12 @@ void CallBackMsg( int msgtype, void *param, int length )
             {
                 text = "unknown";
             }
-            
-            printf( "\nALARM: 0x%04X, [%s]\n", zone->flags, text.c_str() );
-            fflush( stdout );
+
+            char tmpStr[80] = {0};
+            snprintf( tmpStr, 80, "ALARM: 0x%04X, [%s]", zone->flags, text.c_str() );
+            flStatBox->copy_label( tmpStr );
+            flStatBox->redraw();
+
         }break;
         
         // Obtain global parameters of the network-enabled radar
@@ -422,16 +431,20 @@ void CallBackMsg( int msgtype, void *param, int length )
         // Print information (which can also be written as a log).
         case 8:
         {
-            std::string istr = (const char*)param;
-            printf( "\nINFO: %s\n", istr.c_str() );
-            fflush( stdout );
+            char tmpStr[80] = {0};                        
+            snprintf( tmpStr, 80, "INFO: %s", (const char*)param );
+
+            flStatBox->copy_label( tmpStr );
+            flStatBox->redraw();
         }break;
         
         case 9:
         {
-            std::string estr = (const char*)param;
-            printf( "\nERROR: %s\n", estr.c_str() );
-            fflush( stdout );
+            char tmpStr[80] = {0};                        
+            snprintf( tmpStr, 80, "ERROR: %s", (const char*)param );
+
+            flStatBox->copy_label( tmpStr );
+            flStatBox->redraw();
         }break;
 	}
 }
@@ -462,6 +475,19 @@ int initGUI()
                 flRndrBox->image( flRndrImg );
                 clearRndrBack();
             }
+        }
+        
+        // overlay status text printing box.
+        flStatBox = new Fl_Box( flRndrBox->x(), flRndrBox->y(),
+                                flRndrBox->w(), flRndrBox->h(),
+                                "Connecting ... " );
+        if ( flStatBox != nullptr )
+        {
+            flStatBox->box( FL_NO_BOX );
+            flStatBox->align( FL_ALIGN_INSIDE | FL_ALIGN_TOP_LEFT );
+            flStatBox->labelfont( FL_COURIER );
+            flStatBox->labelsize( 20 );
+            flStatBox->labelcolor( 0xEECC8800 );
         }
         
         flWindow->end();
