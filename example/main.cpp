@@ -61,18 +61,37 @@ void clearRndrBack( bool dolock = false )
     fl_imgtk::draw_smooth_line_ex( dstImg,
                                    0, dstImg->h() / 2,
                                    dstImg->w(), dstImg->h() / 2,
-                                   1.5f, 0x44FF44FF );
+                                   0.5f, 0x44FF446F );
+    #pragma omp parallel for
+    for( size_t cnt=dstImg->w()/2+5; cnt<dstImg->w(); cnt+=5 )
+    {
+        fl_imgtk::draw_smooth_line_ex( dstImg,
+                                       cnt, dstImg->h() / 2,
+                                       cnt, dstImg->h() / 2 + 10,
+                                       0.5f, 0x44FF446F );  
+    }
+                                   
     // - -|- -   
     fl_imgtk::draw_smooth_line_ex( dstImg,
                                    dstImg->w() / 2, 0,
                                    dstImg->w() / 2, dstImg->h(),
-                                   1.5f, 0x44FF44FF );
-    #pragma omp parallel for                        
-    for( size_t cnt=0; cnt<360; cnt+=4 )
+                                   0.5f, 0x44FF446F );
+    #pragma omp parallel for
+    for( size_t cnt=0; cnt<dstImg->h()/2; cnt+=5 )
+    {
+        fl_imgtk::draw_smooth_line_ex( dstImg,
+                                       dstImg->w() / 2, cnt,
+                                       dstImg->w() / 2 + 10, cnt,
+                                       0.5f, 0x44FF446F );  
+    }
+
+
+    #pragma omp parallel for
+    for( size_t cnt=0; cnt<360; cnt+=5 )
     {
         float distancef = (float)(dstImg->w() / 3 );
         float linedistf = 50.f;
-        float radf = (float)cnt * ( PI / 180.f );
+        float radf = (float)cnt * ( PI / 180.f ) - RADF_FIX_90DGR;
         
         float cntrX = dstImg->w() / 2;
         float cntrY = dstImg->h() / 2;
@@ -83,12 +102,20 @@ void clearRndrBack( bool dolock = false )
         recY[0] = cntrY + distancef * sin( radf );
         recY[1] = cntrY + ( distancef + linedistf ) * sin( radf );
 
-        unsigned point_col = 0x33CC338F;
+        unsigned point_col = 0x33DD438F;
+        float lthf = 1.f;
         
-        fl_imgtk::draw_smooth_line( dstImg,
-                                    (unsigned)recX[0], (unsigned)recY[0],
-                                    (unsigned)recX[1], (unsigned)recY[1],
-                                    point_col );
+        if ( cnt % 30 == 0 )
+        {
+            point_col = 0x44FF638F;
+            lthf = 3.5f;
+        }
+        
+        fl_imgtk::draw_smooth_line_ex( dstImg,
+                                      (unsigned)recX[0], (unsigned)recY[0],
+                                      (unsigned)recX[1], (unsigned)recY[1],
+                                      lthf,
+                                      point_col );
     }
     
     dstImg->uncache();
@@ -209,7 +236,7 @@ void CallBackMsg( int msgtype, void *param, int length )
                                                       3.2f, 
                                                       dispo_col );
                     }
-                }
+                }  /// of for() with openmp
 
                 dstImg->uncache();
                 flRndrBox->redraw();
@@ -417,7 +444,7 @@ int initGUI()
     Fl::set_color( FL_GRAY, 0x33333300 );
 
     flWindow = new Fl_Double_Window( 810, 810, 
-                                     "PaceCat LiDAR LC50D-E FLTK demo | (C)2026 Raph.K." );
+                                     "PaceCat LiDAR LDS-50C-E FLTK demo | (C)2026 Raph.K." );
     if ( flWindow != nullptr )
     {
         flWindow->begin();
