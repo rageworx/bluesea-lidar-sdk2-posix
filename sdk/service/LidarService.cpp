@@ -163,7 +163,7 @@ int32_t LidarService::ThreadCallBack( void* param )
 	while( State() != 1 )
 	{
 		socklen_t sz = sizeof(addr);
-		char raw[4096] = {0,};
+		char raw[4096] = {0};
 		int dw = recvfrom(sock, raw, sizeof(raw), 0, (struct sockaddr*)&addr, &sz);
         
 		if (dw == sizeof(DevInfoV101))

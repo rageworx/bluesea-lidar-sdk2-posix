@@ -14,7 +14,12 @@
 
 #include <fl_imgtk.h>
 
+#ifdef _WIN32
+#include <resource.h>
+#endif /// of _WIN32
+
 #define DEBUG_PRINT_DATA    0
+#define RADF_1              (0.01745329)
 #define RADF_MAX            (6.2831853072)
 #define RADF_FIX_90DGR      (1.570796)
 
@@ -38,8 +43,19 @@ bool                bPrtCbMsg   = false;
 bool                bUWTitle    = false;
 uint64_t            lAlarmTm    = 0;
 
-// static 360 degree values.
+// static 360.0 degree values.
 float               data360[3600] = { -1.f };
+float               rpmHz       = 0.f;
+float               rotCnt      = 0.f;
+uint64_t            lRotMsTm    = 0;
+
+uint64_t getMonoTick()
+{
+    timespec ts;
+    clock_gettime( CLOCK_MONOTONIC, &ts );
+
+    return (ts.tv_sec * 1000) + (ts.tv_nsec / 1000000);    
+}
 
 void fl_wcb( Fl_Widget* w, void* p )
 {
@@ -239,6 +255,9 @@ void CallBackMsg( int msgtype, void *param, int length )
         case 1:
         {
             UserData *pointdata = (UserData *)param;
+            
+            float min_radf = pointdata->spandata.data.points[0].angle;
+            float max_radf = pointdata->spandata.data.points[pointdata->spandata.data.N-1].angle;
 
             // merge datas 360.0
             #pragma omp parallel for shared(data360)
@@ -264,11 +283,13 @@ void CallBackMsg( int msgtype, void *param, int length )
 
             char tmpStr[160] = {0};
             snprintf( tmpStr, 160, 
-                      "SPAN [%11d:%5d] @@%11d.%d", 
+                      "SPAN [%11d:%5d] @@%11d.%d\n"
+                      "Rendering RPM = %.3f (%.3f Hz)", 
                       pointdata->idx, 
                       pointdata->spandata.data.N,
                       pointdata->spandata.data.ts[0], 
-                      pointdata->spandata.data.ts[1]);
+                      pointdata->spandata.data.ts[1],
+                      rpmHz * 60.f, rpmHz );
                       
             if ( bUWTitle == false )
             {
@@ -343,25 +364,38 @@ void CallBackMsg( int msgtype, void *param, int length )
 
                     if ( bIgnore == false )
                     {
-#ifdef DRAW_BG_POLYGON
-                        fl_imgtk::vecpoint dBgVector[4] = 
-                        {
-                            (int)cntrX, (int)cntrY,
-                            (int)recX, (int)recY,
-                            (int)nxtX, (int)nxtY,
-                            0, 0,
-                        };
-                        fl_imgtk::draw_polygon( dstImg, dBgVector, 3, point_half_col );
-#endif /// of  DRAW_BG_POLYGON                                                      
                         fl_imgtk::draw_smooth_line_ex( dstImg,
-                                                      (unsigned)recX, (unsigned)recY,
-                                                      (unsigned)nxtX, (unsigned)nxtY,
-                                                      3.4f,
+                                                      (int)recX,
+                                                      (int)recY,
+                                                      (int)nxtX, 
+                                                      (int)nxtY,
+                                                      3.1f,
                                                       point_col );
                     }
                 } /// of if ( distancef > 0.0f )
             }  /// of for() with openmp
 
+            // Draw lidar sight triangle.
+            float trifarf = (float)(flRndrBox->w()) * 0.4f;
+            fl_imgtk::vecpoint sightVectors[] = 
+            {
+                (int)cntrX, 
+                (int)cntrY,
+                (int)(cntrX + trifarf * -cos( min_radf )),
+                (int)(cntrY + trifarf * sin( min_radf )),
+                (int)(cntrX + trifarf * -cos( max_radf )),
+                (int)(cntrY + trifarf * sin( max_radf )),
+                0, 0,
+            };
+            fl_imgtk::draw_polygon( dstImg, sightVectors, 3, 0x33663360 );
+            
+            // un-managed rotattion metering ...
+            if ( ( min_radf > 4.537856f && max_radf < 5.585054f )
+                 || ( min_radf >= 0.0f && max_radf < 0.7853982f ) )
+            {
+                rotCnt += 1.0f;
+            }
+            
             dstImg->uncache();
             flRndrBox->redraw();
             flWindow->redraw();
@@ -437,11 +471,32 @@ void CallBackMsg( int msgtype, void *param, int length )
         
         case 4: /// time update ...
         {
+            // Update Hz ..
+            if ( rotCnt > 0.f )
+            {
+                uint64_t curTm = getMonoTick();
+
+                if ( lRotMsTm == 0 )
+                {
+                    lRotMsTm = curTm;
+                }
+                else
+                {
+                    uint64_t tmDiff = curTm - lRotMsTm;
+                    float    rotf = (float)tmDiff / rotCnt;
+#ifdef DEBUG_RPM_EMULATION
+                    printf( "(debug) RPM, rotate count = %.2f, time diff = %llu ms --> %.3f\n",
+                            rotCnt, tmDiff, rotf );
+                    fflush( stdout );
+#endif /// of DEBUG_RPM_EMULATION
+                    rpmHz = 1000.f / rotf;
+                    rotCnt = 0.f;
+                    lRotMsTm = curTm;
+                }
+            }
             if ( lAlarmTm > 0 )
             {
-                timeval tv;
-                gettimeofday(&tv, NULL);
-			    uint64_t curTm = (tv.tv_sec % 3600) * 1000 + tv.tv_usec / 1000;
+			    uint64_t curTm = getMonoTick();
                 
                 if ( lAlarmTm < ( curTm - 1000 ) )
                 {
@@ -467,8 +522,13 @@ void CallBackMsg( int msgtype, void *param, int length )
             char tmpStr[80] = {0};                        
             snprintf( tmpStr, 80, "ERROR: %s", (const char*)param );
 
-            flStatBox->copy_label( tmpStr );
-            flStatBox->redraw();
+            Fl::lock();
+            flAlarmBox->copy_label( tmpStr );
+            flAlarmBox->redraw();
+            Fl::unlock();
+            
+            LidarMsgHdr *zone = (LidarMsgHdr *)param;
+            lAlarmTm = zone->timestamp;
         }break;
 	}
 }
@@ -511,7 +571,7 @@ int initGUI()
             flStatBox->align( FL_ALIGN_INSIDE | FL_ALIGN_TOP_LEFT );
             flStatBox->labelfont( FL_COURIER );
             flStatBox->labelsize( 20 );
-            flStatBox->labelcolor( 0x33FF3300 );
+            flStatBox->labelcolor( 0xCCFFCC00 );
         }
 
         // overlay status text printing box.
@@ -529,6 +589,19 @@ int initGUI()
         flWindow->end();
         flWindow->callback( fl_wcb, nullptr );
         flWindow->show();
+#ifdef _WIN32 
+        // Additional windows dep. resouce handle ...
+        HICON hIcoL = (HICON)LoadImage( fl_display,
+                                        MAKEINTRESOURCE( IDC_ICON_A ),
+                                        IMAGE_ICON,
+                                        64, 64, LR_SHARED );
+     
+        HICON hIcoS = (HICON)LoadImage( fl_display,
+                                        MAKEINTRESOURCE( IDC_ICON_A ),
+                                        IMAGE_ICON,
+                                        16, 16, LR_SHARED );
+        flWindow->icons( hIcoL, hIcoS );
+#endif /// of _WIN32
         
         return 0;
     }
@@ -588,7 +661,20 @@ void* testRun( void* p )
         {
             break;
         }
-        
+#if ENABLED_HEARTBEAT_DETECT_RPM
+        else
+        if ( rpmHz == 0.f )
+        {
+            std::vector<DevConnInfo> devList = lidarSDK->GetLidarsList();
+            if ( devList.size() > 0 )
+            {
+                printf( "(debug)devList = %zu\n", devList.size() );
+                fflush( stdout );
+                rpmHz = devList[0].info.v101.rpm / 60.f;
+            }            
+        }
+#endif /// of ENABLED_HEARTBEAT_DETECT_RPM
+
         usleep( 100000 );
         Fl::awake();
 	}

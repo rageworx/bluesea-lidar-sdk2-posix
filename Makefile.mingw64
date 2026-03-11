@@ -46,6 +46,7 @@ CXXFLAGS += -O2 -s
 CXXFLAGS += -I$(SRC_DIR)
 CXXFLAGS += -I$(SRC_DIR)/service
 CXXFLAGS += -I$(MONGO_DIR)
+CXXFLAGS += -Ires
 CXXFLAGS += $(FLTKCFG_CXF)
 CXXFLAGS += $(FLIMGTK_CXF)
 
@@ -120,6 +121,6 @@ $(LIBOUT): $(CXXOBJS) $(COBJS) $(CXXSVCOBJS) $(CMONGOOBJS)
 
 $(BIN_DIR)/demo: example/main.cpp
 	@echo "Building DEMO ($@) ..."
-	@$(CXX) $^ $(WROBJ) $(CXXFLAGS) -mwindows -L$(BIN_DIR) -l$(LIB_NM) $(LDFLAGS) \
-	 -static -o $@
+	@$(CXX) $^ $(CXXFLAGS) -mwindows -L$(BIN_DIR) -l$(LIB_NM) \
+	 $(LDFLAGS) $(WROBJ) -static -o $@
 
