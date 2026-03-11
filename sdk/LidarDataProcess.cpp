@@ -114,7 +114,7 @@ bool setup_lidar_udp( int fd_udp, RunScript *arg )
 		bool ret = judgepcIPAddrIsValid(arg->ntp_ip);
 		if (!ret)
 		{
-			PRTSTDERR( "ntp ip set failure!");
+			PRTSTDERR( "ntp ip set failure!\n" );
 		}
 		else
 		{

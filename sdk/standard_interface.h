@@ -20,7 +20,7 @@ class BlueSeaLidarSDK
         * @date:          2022-08-21
         * @description:   Get current lidar info
         * @Parameter:
-        *                 1.ID[int,IN]          CN:雷达ID          EN:lidar ID
+        *                 1.ID[int,IN]          lidar ID
         *
         * @return:        RunConfig  struct
         * @others:        Null
@@ -32,7 +32,7 @@ class BlueSeaLidarSDK
         * @date:          2022-07-14
         * @description:   CN:通过配置文件的路径添加ID  EN:add lidar by path
         * @Parameter:
-        *                 1.cfg_file_name[const char*,IN]           CN:配置文件路径            EN:config file path
+        *                 1.cfg_file_name[const char*,IN]    config file path
         *
         * @return:        LIDAR ID
         * @others:        Null
@@ -42,9 +42,9 @@ class BlueSeaLidarSDK
         /************************************************
         * @functionName:  delLidarByID
         * @date:          2022-07-14
-        * @description:   CN:通过addLidarByPath返回的ID删除指定雷达  EN:Delete the specified lidar by the ID returned by addLidarByPath
+        * @description:   Delete the specified lidar by the ID returned by addLidarByPath
         * @Parameter:
-        *                 1.ID[int,IN]          CN:雷达ID          EN:Lidar ID
+        *                 1.ID[int,IN]          Lidar ID
         *
         * @return:        true/false
         * @others:        Null
@@ -54,10 +54,10 @@ class BlueSeaLidarSDK
         /************************************************
         * @functionName:  setCallBackPtr
         * @date:          2022-07-14
-        * @description:   CN:根据ID设置雷达的回调打印函数  EN:Setting up a callback print function for the radar based on an ID
+        * @description:   Setting up a callback print function for the radar based on an ID
         * @Parameter:
-        *                 1.ID[int,IN]          CN:雷达ID          EN:Lidar ID
-        *                 1.ptr[printfMsg,IN]   CN:回调打印函数       EN:Callback print function
+        *                 1.ID[int,IN]          Lidar ID
+        *                 1.ptr[printfMsg,IN]   Callback print function
         *
         * @return:        NUll
         * @others:        Null
@@ -67,9 +67,9 @@ class BlueSeaLidarSDK
         /************************************************
         * @functionName:  openDev
         * @date:          2022-03-28
-        * @description:   CN:启动雷达  EN:start lidar
+        * @description:   Start lidar
         * @Parameter:
-        *                 1.ID[int,IN]          CN:雷达ID          EN:Lidar ID
+        *                 1.ID[int,IN]          Lidar ID
         *
         * @return:        true/false
         * @others:        Null
@@ -79,24 +79,34 @@ class BlueSeaLidarSDK
         /************************************************
         * @functionName:  StopDrv
         * @date:          2022-03-28
-        * @description:   CN:关闭雷达  EN:stop lidar
+        * @description:   Stop lidar
         * @Parameter:
-        *                 1.ID[int,IN]          CN:雷达ID          EN:Lidar ID
+        *                 1.ID[int,IN]          Lidar ID
         *
         * @return:        Null
         * @others:        Null
         *************************************************/
         void StopDev(int ID);
         
+        /************************************************
+        * @functionName:  GetDevState
+        * @date:          2026-03-02
+        * @description:   Get device state
+        * @Parameter:
+        *                 1.ID[int,IN]          Lidar ID
+        *
+        * @return:        state value, ONLINE | OFFLINE
+        * @others:        Null
+        *************************************************/
         int  GetDevState(int ID);
         
         /************************************************
         * @functionName:  GetDevInfo
         * @date:          2023-08-21
-        * @description:   CN:获取雷达全局参数  EN:get lidar config arg
+        * @description:   Get lidar config arg
         * @Parameter:
-        *                 1.ID[int,IN]          CN:雷达ID          EN:Lidar ID
-        *                 2.eepromv101[EEpromV101,OUT]          CN:雷达参数信息            EN:Lidar arg info
+        *                 1.ID[int,IN]                  Lidar ID
+        *                 2.eepromv101[EEpromV101,OUT]  Lidar arg info
         *
         * @return:        true/false
         * @others:        Null
@@ -106,11 +116,11 @@ class BlueSeaLidarSDK
         /************************************************
          * @functionName:  ControlDrv
          * @date:          2023-08-21
-         * @description:   CN:设置雷达开启或者暂停  EN:Set the lidar on or off
+         * @description:   Set the lidar on or off
          * @Parameter:    
-         *                  1.ID[int,IN]            CN:雷达ID          EN:Lidar ID
-         *                  2.num   [int,IN]   CN:指令长度  EN:cmd length
-         *                  3.cmd   [int,IN]   CN:指令内容  EN:cmd  data
+         *                  1.ID[int,IN]       Lidar ID
+         *                  2.num   [int,IN]   cmd length
+         *                  3.cmd   [int,IN]   cmd  data
          * @return:         true/false
          * @others:        Null
          *************************************************/
@@ -119,8 +129,8 @@ class BlueSeaLidarSDK
         /************************************************
          * @functionName:  getVersion
          * @date:          2022-05-09
-         * @description:   CN:获取版本号  EN:get version
-         * @Parameter:    Null
+         * @description:   Get version
+         * @Parameter:     Null
          * @return:        const char*
          * @others:        Null
          *************************************************/
@@ -129,9 +139,9 @@ class BlueSeaLidarSDK
         /************************************************
          * @functionName:  ZoneSection
          * @date:          2022-10-18
-         * @description:   CN:切换当前防区  EN:change  section
-         * @Parameter:    1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
-         *                2.section [char,IN]   CN:激活的防区序号  EN:Active zone serial number
+         * @description:   Change  section
+         * @Parameter:    1.ID [long,IN]        Lidar ID
+         *                2.section [char,IN]   Active zone serial number
          * @return:        true/false
          * @others:        防区取值范围 0-9 a-f
          *************************************************/
@@ -140,12 +150,12 @@ class BlueSeaLidarSDK
         /************************************************
          * @functionName:  SetUDP
          * @date:          2023-07-31
-         * @description:   CN:设置雷达IP  EN:set lidar ip
-         * @Parameter:      1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
-         *                  2.ip    [char*,IN]   CN:ip地址    EN:ip
-         *                  3.mask  [char*,IN]   CN:子网掩码    EN:mask
-         *                  4.gateway   [char*,IN]   CN:网关  EN:gateway
-         *                  5.port  [int,IN]   CN:端口    EN:port
+         * @description:   Set lidar ip
+         * @Parameter:      1.ID    [long,IN]   Lidar ID
+         *                  2.ip    [char*,IN]  ip
+         *                  3.mask  [char*,IN]  mask
+         *                  4.gateway   [char*,IN]   gateway
+         *                  5.port  [int,IN]    port
          * @return:        true/false
          * @others:        Null
          *************************************************/
@@ -154,10 +164,10 @@ class BlueSeaLidarSDK
         /************************************************
          * @functionName:  SetDST
          * @date:          2023-07-31
-         * @description:   CN:设置雷达上传IP  EN:set lidar post ip  address
-         * @Parameter:      1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
-         *                  2.ip[char*,IN]   CN:ip地址    EN:ip
-         *                  3.port[int,IN]   CN:端口  EN:port
+         * @description:   Set lidar post ip  address
+         * @Parameter:      1.ID [long,IN]   Lidar ID
+         *                  2.ip[char*,IN]   ip
+         *                  3.port[int,IN]   port
          * @return:        true/false
          * @others:        Null
          *************************************************/
@@ -166,9 +176,9 @@ class BlueSeaLidarSDK
         /************************************************
          * @functionName:  SetRPM
          * @date:          2023-08-21
-         * @description:   CN:设置雷达转速  EN:set lidar rpm
-         * @Parameter:      1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
-         *                  2.RPM[int,IN]   CN:转速   EN:rpm
+         * @description:   Set lidar rpm
+         * @Parameter:      1.ID [long,IN]  Lidar ID
+         *                  2.RPM[int,IN]   rpm
          * @return:        true/false
          * @others:        rpm   (300-3000)
          *************************************************/
@@ -177,8 +187,8 @@ class BlueSeaLidarSDK
         /************************************************
          * @functionName:  SetTFX
          * @date:          2023-08-21
-         * @description:   CN:设置雷达固定上传  EN:set lidar fixed upload
-         * @Parameter:      1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
+         * @description:   Set lidar fixed upload
+         * @Parameter:      1.ID [long,IN]   Lidar ID
          *                  2.tfx[bool,IN]   true/false
          * @return:        true/false
          * @others:        Null
@@ -188,8 +198,8 @@ class BlueSeaLidarSDK
         /************************************************
          * @functionName:  SetDSW
          * @date:          2023-08-21
-         * @description:   CN:设置雷达滤波，去拖点  EN:set lidar filtering
-         * @Parameter:      1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
+         * @description:   Set lidar filtering
+         * @Parameter:      1.ID [long,IN]   Lidar ID
          *                  2.tfx[bool,IN]   true/false
          * @return:        true/false
          * @others:        Null
@@ -199,8 +209,8 @@ class BlueSeaLidarSDK
         /************************************************
          * @functionName:  SetSMT
          * @date:          2023-08-21
-         * @description:   CN:设置雷达数据平滑  EN:set lidar smooth
-         * @Parameter:      1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
+         * @description:   Set lidar smooth
+         * @Parameter:      1.ID [long,IN]   Lidar ID
          *                  2.smt[bool,IN]   true/false
          * @return:        true/false
          * @others:        Null
@@ -210,7 +220,7 @@ class BlueSeaLidarSDK
         /************************************************
          * @functionName:  SetPST
          * @date:          2023-08-21
-         * @description:   CN:设置雷达上传方式  EN:set lidar upload way
+         * @description:   Set lidar upload way
          * @Parameter:      1.ID [long,IN]  Lidar ID
          *                  2.mode[int,IN]  0 no data 1 only data 2 only alarm 3 data+alarm
          * @return:        true/false
@@ -221,9 +231,9 @@ class BlueSeaLidarSDK
         /************************************************
          * @functionName:  SetDID
          * @date:          2023-08-21
-         * @description:   CN:设置雷达编号  EN:set lidar number
-         * @Parameter:      1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
-         *                  2.number[uint32_t,IN]   CN：雷达的编号  EN:lidar number     
+         * @description:   Set lidar number
+         * @Parameter:      1.ID [long,IN]          Lidar ID
+         *                  2.number[uint32_t,IN]   lidar number     
          * @return:        true/false
          * @others:        Repeatable, different from ID
          *************************************************/
@@ -233,10 +243,10 @@ class BlueSeaLidarSDK
          * @functionName:  SetNTP
          * @date:          2025-01-17
          * @description:   Set lidar ntp property
-         * @Parameter:      1.ID [long,IN]  CN: 雷达ID  EN:Lidar ID
-         *                  2.ntp_ip[char*,IN]   CN：雷达的ntp ip  EN:lidar ntp upload ip   
-         *                  3.ntp_port[uint32_t,IN]   CN：雷达的ntp上传端口  EN:lidar ntp upload port     
-         *                  4.enable[bool,IN]   CN：使能  EN:enable    
+         * @Parameter:      1.ID [long,IN]       Lidar ID
+         *                  2.ntp_ip[char*,IN]   lidar ntp upload ip   
+         *                  3.ntp_port[uint32_t,IN]   lidar ntp upload port     
+         *                  4.enable[bool,IN]    enable    
          * @return:        true/false
          * @others:        Repeatable, different from ID
          *************************************************/

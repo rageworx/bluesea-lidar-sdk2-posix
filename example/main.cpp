@@ -30,16 +30,31 @@ Fl_Double_Window*   flWindow    = nullptr;
 Fl_Box*             flRndrBox   = nullptr;
 Fl_RGB_Image*       flRndrImg   = nullptr;
 Fl_Box*             flStatBox   = nullptr;
+Fl_Box*             flAlarmBox  = nullptr;
 
 pthread_mutex_t     pmtxWait    = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t      pcondData   = PTHREAD_COND_INITIALIZER;
 bool                bPrtCbMsg   = false;
+bool                bUWTitle    = false;
+uint64_t            lAlarmTm    = 0;
+
+// static 360 degree values.
+float               data360[3600] = { -1.f };
 
 void fl_wcb( Fl_Widget* w, void* p )
 {
     if ( w == flWindow )
     {
         w->hide();
+    }
+}
+
+inline void flushData360()
+{
+    #pragma omp parallel for
+    for( size_t cnt=0; cnt<3600; cnt++)
+    {
+        data360[cnt] = -1.f;
     }
 }
 
@@ -52,38 +67,51 @@ void clearRndrBack( bool dolock = false )
     
     Fl_RGB_Image* dstImg = (Fl_RGB_Image*)flRndrBox->image();
     
+    uint32_t col_bg = 0x010203FF;
+    uint32_t col_ln = 0x30373FFF;
+    uint32_t col_p0 = 0x37303FFF;
+    uint32_t col_p1 = 0x3F3037FF;
+    
     // clear background
     fl_imgtk::draw_fillrect( dstImg, 0, 0, 
                              dstImg->w(),
                              dstImg->h(),
-                             0x223344FF );
+                             col_bg );
                              
     // -------
     fl_imgtk::draw_smooth_line_ex( dstImg,
                                    0, dstImg->h() / 2,
                                    dstImg->w(), dstImg->h() / 2,
-                                   0.5f, 0x44FF446F );
+                                   0.5f, col_ln );
+    size_t cnts = size_t(dstImg->w()/2)+5;
     #pragma omp parallel for
-    for( size_t cnt=size_t(dstImg->w()/2)+5; cnt<(size_t)dstImg->w(); cnt+=5 )
+    for( size_t cnt=cnts; cnt<(size_t)dstImg->w(); cnt+=10 )
     {
+        float ltf = 0.5f;
+        size_t cntc = cnt - cnts;
+        if ( cntc%50 == 0 && cnt != cnts ) ltf = 2.5f;        
+        
         fl_imgtk::draw_smooth_line_ex( dstImg,
-                                       cnt, dstImg->h() / 2,
-                                       cnt, dstImg->h() / 2 + 10,
-                                       0.5f, 0x44FF446F );  
+                                       cnt, dstImg->h() / 2 + 1,
+                                       cnt, dstImg->h() / 2 + 11,
+                                       ltf, col_ln );  
     }
                                    
     // - -|- -   
     fl_imgtk::draw_smooth_line_ex( dstImg,
                                    dstImg->w() / 2, 0,
                                    dstImg->w() / 2, dstImg->h(),
-                                   0.5f, 0x44FF446F );
+                                   0.5f, col_ln );
     #pragma omp parallel for
-    for( size_t cnt=0; cnt<(size_t)(dstImg->h()/2); cnt+=5 )
+    for( size_t cnt=0; cnt<(size_t)(dstImg->h()/2); cnt+=10 )
     {
+        float ltf = 0.5f;
+        if ( cnt%50 == 0 && cnt != 0 ) ltf = 2.5f;
+        
         fl_imgtk::draw_smooth_line_ex( dstImg,
-                                       dstImg->w() / 2, cnt,
-                                       dstImg->w() / 2 + 10, cnt,
-                                       0.5f, 0x44FF446F );  
+                                       dstImg->w() / 2 + 1, cnt,
+                                       dstImg->w() / 2 + 11, cnt,
+                                       ltf, col_ln );  
     }
 
 
@@ -103,13 +131,13 @@ void clearRndrBack( bool dolock = false )
         recY[0] = cntrY + distancef * sin( radf );
         recY[1] = cntrY + ( distancef + linedistf ) * sin( radf );
 
-        unsigned point_col = 0x33DD438F;
+        unsigned point_col = col_p0;
         float lthf = 1.f;
         
         if ( cnt % 30 == 0 )
         {
-            point_col = 0x44FF638F;
-            lthf = 3.5f;
+            point_col = col_p1;
+            lthf = 5.0f;
         }
         
         fl_imgtk::draw_smooth_line_ex( dstImg,
@@ -125,6 +153,67 @@ void clearRndrBack( bool dolock = false )
     {
         Fl::unlock();
     }
+}
+
+/**
+ * Maps a float (0.0 to 1.0) to a 24-bit RGB integer (0xRRGGBB00)
+ * Uses a standard Hue-based rainbow spectrum.
+ */
+uint32_t distanceToColor(float distf) 
+{
+    // filter distf.
+    if ( distf > 1.f ) { distf = 1.f; }
+    else if ( distf < 0.f ) { distf = 0.f; }
+    
+    // Convert 0.0-1.0 to 0-360 degrees (Hue)
+    float h = distf * 360.0f;
+    float s = 1.0f; /// Full Saturation
+    float v = 1.0f; /// Full Value/Brightness
+
+    float c = v * s;
+    float x = c * (1.0f - std::abs(std::fmod(h / 60.0f, 2.0f) - 1.0f));
+    float m = v - c;
+
+    float r, g, b;
+    if (h < 60)      { r = c; g = x; b = 0; }
+    else if (h < 120) { r = x; g = c; b = 0; }
+    else if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = x; g = 0; b = c; }
+    else             { r = c; g = 0; b = x; }
+
+    uint8_t R = static_cast<uint8_t>((r + m) * 255);
+    uint8_t G = static_cast<uint8_t>((g + m) * 255);
+    uint8_t B = static_cast<uint8_t>((b + m) * 255);
+
+    // Combine into 0xRRGGBB00
+    return (R << 24) | (G << 16) | ( B << 8 );
+}
+
+float getDist( int32_t degIdx )
+{
+    float retf = 0.f;
+    float divf = 0.f;
+    
+    if ( degIdx < 3600 && degIdx >= 0 )
+    {
+        for( size_t x=0; x<10; x++ )
+        {
+            float curf = data360[degIdx+x];
+            if ( curf > 0.f )
+            {
+                retf += curf;
+                divf += 1.f;
+            }
+        }
+        
+        if ( divf > 0.f )
+        {
+            retf /= divf;
+        }
+    }
+    
+    return retf;
 }
 
 void CallBackMsg( int msgtype, void *param, int length )
@@ -150,106 +239,134 @@ void CallBackMsg( int msgtype, void *param, int length )
         case 1:
         {
             UserData *pointdata = (UserData *)param;
-            
-            if ( pointdata->type == FRAMEDATA )
-            {
-#ifdef DEBUG_STATE
-                 printf( "FRAME: idx:%3d %16s %5d num:%5zu timestamp:%d.%d \n", 
-                         pointdata->idx, 
-                         pointdata->connectArg1, 
-                         pointdata->connectArg2, 
-                         pointdata->framedata.data.size(), 
-                         pointdata->framedata.ts[0], 
-                         pointdata->framedata.ts[1] );
-#endif /// of DEBUG_STATE
-                 clearRndrBack( true );
-            }
-            else
-            {
-                char tmpStr[160] = {0};
-                snprintf( tmpStr, 160, 
-                          "SPAN: idx=%13d | ip=%16s | port=%5d\n"
-                          "      num=%5d | timestamp=%20d.%d", 
-                          pointdata->idx, 
-                          pointdata->connectArg1, 
-                          pointdata->connectArg2, 
-                          pointdata->spandata.data.N, 
-                          pointdata->spandata.data.ts[0], 
-                          pointdata->spandata.data.ts[1]);
 
-                Fl::lock();
-                flStatBox->copy_label( tmpStr );
-                flStatBox->redraw();
-                
-                Fl_RGB_Image* dstImg = (Fl_RGB_Image*)flRndrBox->image();
-                
-                // scaling X, Y .. (acutally meaningless)
-                float cntrX = (float)dstImg->w() / 2;
-                float cntrY = (float)dstImg->h() / 2;
-                float putCW = (float)dstImg->w() * 0.3f;
-                
-                // then go !
-                #pragma omp parallel for
-                for ( size_t i = 0; i <pointdata->spandata.data.N; i++ )
+            // merge datas 360.0
+            #pragma omp parallel for shared(data360)
+            for ( size_t i = 0; i <pointdata->spandata.data.N; i++ )
+            {
+                float distancef = pointdata->spandata.data.points[i].distance;
+                float radf = pointdata->spandata.data.points[i].angle;
+                int   degf = ( radf * (180.f / PI) ) * 10.f;
+                degf %= 3600;
+
+                // simple but some dangerous merge method.
+                // has some error, but good to look.
+                if ( data360[degf] > 0.f )
                 {
-                    float scalef = 0.8f;
-                    float distancef = pointdata->spandata.data.points[i].distance
-                                      * putCW * scalef;
-                    float radf = pointdata->spandata.data.points[i].angle \
-                                 - RADF_FIX_90DGR;
-                    float recX = cntrX + distancef * -cos( radf );
-                    float recY = cntrY + distancef * sin( radf );
-                    float farL = 30.f;
-                    float farX = recX + farL * -cos( radf );
-                    float farY = recY + farL * sin( radf );
-                    float endL = std::max( dstImg->w(), dstImg->h() ) - distancef;
-                    float endX = farX + endL * -cos( radf );
-                    float endY = farY + endL * sin( radf );
+                    data360[degf] += distancef;
+                    data360[degf] /= 2.f;
+                }
+                else
+                {
+                    data360[degf] = distancef;
+                }
+            }
+
+            char tmpStr[160] = {0};
+            snprintf( tmpStr, 160, 
+                      "SPAN [%11d:%5d] @@%11d.%d", 
+                      pointdata->idx, 
+                      pointdata->spandata.data.N,
+                      pointdata->spandata.data.ts[0], 
+                      pointdata->spandata.data.ts[1]);
+                      
+            if ( bUWTitle == false )
+            {
+                char tmpWinTitle[80] = {0};
+                snprintf( tmpWinTitle, 80, "Device: %s:%d",
+                          pointdata->connectArg1, 
+                          pointdata->connectArg2 );
+                flWindow->copy_label( tmpWinTitle );
+                bUWTitle = true;
+            }
+
+            Fl::lock();
+
+            clearRndrBack();
+
+            flStatBox->copy_label( tmpStr );
+            flStatBox->redraw();
+            
+            Fl_RGB_Image* dstImg = (Fl_RGB_Image*)flRndrBox->image();
+            
+            // scaling X, Y .. (acutally meaningless)
+            float cntrX = (float)dstImg->w() / 2;
+            float cntrY = (float)dstImg->h() / 2;
+            float putCW = (float)dstImg->w() * 0.3f;
+            
+            // then go with OpenMP.
+            #pragma omp parallel for
+            for ( size_t i = 0; i <3600; i+=10 )
+            {
+                float scalef = 1.f; /// it should be adjustabled, current = 80 %.
+                float distfc = getDist(i) * putCW * scalef;
+                float distfn = getDist((i+10)%3600) * putCW * scalef;
+                
+                if ( distfc > 0.05f && distfn > 0.05f )
+                {
+                    float deg10pf = (float)i;
+                    float deg10nf = (float)((i+10)%3600);
+                    float radfc = deg10pf/10.f * ( PI / 180.f) - RADF_FIX_90DGR;
+                    float radfn = deg10nf/10.f * ( PI / 180.f) - RADF_FIX_90DGR;
+                    float recX = cntrX + distfc * -cos( radfc );
+                    float recY = cntrY + distfc * sin( radfc );
+                    float nxtX = cntrX + distfn * -cos( radfn );
+                    float nxtY = cntrX + distfn * sin( radfn );
                                         
                     if ( recX <= 0 ) recX = dstImg->w() / 2;
                     if ( recY <= 0 ) recY = dstImg->h() / 2;
                     
-                    unsigned point_col = 0xFF444400;
-                    unsigned dispo_col = 0x77111100;
+                    // Colorful RGB -> B to G to R ...
+                    float distaf = ( distfc + distfn ) / 2.f;
+                    float distnf = distaf / 1000.f;
+                    if ( distnf > 1.0f ) distnf = 1.0f;
                     
-                    float max_conf = 400.f;
+                    // convert normalized distance to HSV color spaced RGB.
+                    uint32_t point_col = distanceToColor( distnf );
+                    uint32_t point_half_col = point_col;
+                    
+                    float max_conf = 128.f;
                     float conff = pointdata->spandata.data.points[i].confidence / max_conf;
                     if ( conff > 1.f ) conff = 1.f;
                     
                     uint8_t conf8 = (uint8_t)(conff * 128.f);
-                    point_col |= (uint32_t)conf8;
-                    dispo_col |= (uint32_t)((float)conf8 * 0.5f);
+                    point_col |= (uint32_t)(conf8 + 0x70);
+                    point_half_col |= (uint32_t)(conf8/2);
                     
                     // filter out errors...
                     bool bIgnore = false;
-                    float cfThrs = 0.025f;
                     
-                    if ( recX == cntrX || recY == cntrY || conff < cfThrs )
+                    if ( recX == cntrX || recY == cntrY )
                     {
                         bIgnore = true;
                     }
 
                     if ( bIgnore == false )
                     {
+#ifdef DRAW_BG_POLYGON
+                        fl_imgtk::vecpoint dBgVector[4] = 
+                        {
+                            (int)cntrX, (int)cntrY,
+                            (int)recX, (int)recY,
+                            (int)nxtX, (int)nxtY,
+                            0, 0,
+                        };
+                        fl_imgtk::draw_polygon( dstImg, dBgVector, 3, point_half_col );
+#endif /// of  DRAW_BG_POLYGON                                                      
                         fl_imgtk::draw_smooth_line_ex( dstImg,
                                                       (unsigned)recX, (unsigned)recY,
-                                                      (unsigned)farX, (unsigned)farY,
-                                                      3.2f, 
+                                                      (unsigned)nxtX, (unsigned)nxtY,
+                                                      3.4f,
                                                       point_col );
-                        fl_imgtk::draw_smooth_line_ex( dstImg,
-                                                      (unsigned)farX, (unsigned)farY,
-                                                      (unsigned)endX, (unsigned)endY,
-                                                      3.2f, 
-                                                      dispo_col );
                     }
-                }  /// of for() with openmp
+                } /// of if ( distancef > 0.0f )
+            }  /// of for() with openmp
 
-                dstImg->uncache();
-                flRndrBox->redraw();
-                flWindow->redraw();
-                Fl::unlock();
-                Fl::awake();
-            }            
+            dstImg->uncache();
+            flRndrBox->redraw();
+            flWindow->redraw();
+            Fl::unlock();
+            Fl::awake();
         }break;
     
         // Real-time alarm data
@@ -305,129 +422,36 @@ void CallBackMsg( int msgtype, void *param, int length )
             
             if ( text.size() == 0 )
             {
-                text = "unknown";
+                // unkown alarm should be ignored.
+                break;
             }
 
             char tmpStr[80] = {0};
             snprintf( tmpStr, 80, "ALARM: 0x%04X, [%s]", zone->flags, text.c_str() );
-            flStatBox->copy_label( tmpStr );
-            flStatBox->redraw();
-
+            Fl::lock();
+            flAlarmBox->copy_label( tmpStr );
+            flAlarmBox->redraw();
+            Fl::unlock();
+            lAlarmTm = zone->timestamp;
         }break;
         
-        // Obtain global parameters of the network-enabled radar
-        case 3:
+        case 4: /// time update ...
         {
-            EEpromV101 *eepromv101 = (EEpromV101 *)param;
-            // Type, Number, Serial Number
-            printf( "dev info: Device ID:%d\t Serial Number:%s\t Type:%s\n", 
-                    eepromv101->dev_id, 
-                    eepromv101->dev_sn, 
-                    eepromv101->dev_type );
-            // IP address, subnet mask, gateway address, default target IP, 
-            // default target UDP port number, 
-            // default UDP outbound service port number.
-            char tmp_IPv4[16] = {0};
-            char tmp_mask[16] = {0};
-            char tmp_gateway[16] = {0};
-            char tmp_srv_ip[16] = {0};
-
-            snprintf( tmp_IPv4, 16, "%d.%d.%d.%d", \
-                      eepromv101->IPv4[0], 
-                      eepromv101->IPv4[1], 
-                      eepromv101->IPv4[2], 
-                      eepromv101->IPv4[3]);
-                     
-            snprintf( tmp_mask, 16, "%d.%d.%d.%d", \
-                      eepromv101->mask[0], 
-                      eepromv101->mask[1], 
-                      eepromv101->mask[2], 
-                      eepromv101->mask[3] );
-                     
-            snprintf( tmp_gateway, 16, "%d.%d.%d.%d", \
-                      eepromv101->gateway[0], 
-                      eepromv101->gateway[1], 
-                      eepromv101->gateway[2], 
-                      eepromv101->gateway[3] );
-                      
-            snprintf( tmp_srv_ip, 16, "%d.%d.%d.%d", \
-                      eepromv101->srv_ip[0], 
-                      eepromv101->srv_ip[1], 
-                      eepromv101->srv_ip[2], 
-                      eepromv101->srv_ip[3] );
-
-            printf( "dev info: \n"
-                    "   - IP address:%s Subnet mask:%s Gateway address:%s\n"
-                    "   - Default target IP:%s Default target UDP port:%d\n"
-                    "   - Default UDP outbound service port:%d\n",
-                    tmp_IPv4, 
-                    tmp_mask, 
-                    tmp_gateway, 
-                    tmp_srv_ip, 
-                    eepromv101->srv_port, 
-                    eepromv101->local_port );
-
-            /*char tmp_ranger_bias[8] = {0};
-            memcpy(tmp_ranger_bias, eepromv101->ranger_bias, sizeof(eepromv101->ranger_bias) - 1);*/
-            
-            // Speed, motor starting parameters,
-            // FIR filter order, revolutions, resolution, 
-            // automatic upload upon startup, fixed upload, 
-            // data point smoothing, dragging point removal, 
-            // recording correction coefficients, network heartbeat, 
-            // recording I/O port polarity.
-            printf( "dev info \n"
-                    "   - Speed (RPM): %d\n"
-                    "   - Motor starting parameters: %d \n"
-                    "   - FIR filter order: %d \n"
-                    "   - Number of revolutions: %d \n"
-                    "   - Resolution:%d \n"
-                    "   - Automatic upload on boot:%d \n"
-                    "   - Fixed upload:%d \n"
-                    "   - Data point smoothing:%d \n"
-                    "   - Remove dragging points:%d \n"
-                    "   - Network heartbeat:%d \n"
-                    "   - Record I/O port polarity:%d\n",
-                    eepromv101->RPM, 
-                    eepromv101->RPM_pulse, 
-                    eepromv101->fir_filter, 
-                    eepromv101->cir, 
-                    eepromv101->with_resample, 
-                    eepromv101->auto_start,
-                    eepromv101->target_fixed, 
-                    eepromv101->with_smooth, 
-                    eepromv101->with_filter, 
-                    eepromv101->net_watchdog, 
-                    eepromv101->pnp_flags);
-
-            printf( "dev info \n"
-                    "   - Smoothing coefficient: %d \n"
-                    "   - Activated zone: %d \n"
-                    "   - Uploaded data type: %d\n", 
-                    eepromv101->deshadow, 
-                    eepromv101->zone_acted, 
-                    eepromv101->should_post);
-            fflush( stdout );
+            if ( lAlarmTm > 0 )
+            {
+                timeval tv;
+                gettimeofday(&tv, NULL);
+			    uint64_t curTm = (tv.tv_sec % 3600) * 1000 + tv.tv_usec / 1000;
+                
+                if ( lAlarmTm < ( curTm - 1000 ) )
+                {
+                    Fl::lock();
+                    flAlarmBox->label( nullptr );
+                    Fl::unlock();
+                }
+            }
         }break;
-
-        // Obtain radar timestamp print information 
-        // (for network versions, the radar-returned timestamp; 
-        //  for serial versions, the timestamp received by the local machine).
-        case 4:
-        {
- #if PRT_PROGRESS
-            DevTimestamp *devtimestamp = (DevTimestamp *)param;
-            printf( "\n" );
-            printf( "\nTIMESTAMP:lidar_ip:%s lidar_port:%d time:%d delay:%d\n", 
-                    devtimestamp->ip, 
-                    devtimestamp->port, 
-                    devtimestamp->timestamp, 
-                    devtimestamp->delay);
-            fflush( stdout );
-#endif /// of PRT_PROGRESS
-            clearRndrBack( true );
-        }break;
-        
+                    
         // Print information (which can also be written as a log).
         case 8:
         {
@@ -479,7 +503,7 @@ int initGUI()
         
         // overlay status text printing box.
         flStatBox = new Fl_Box( flRndrBox->x(), flRndrBox->y(),
-                                flRndrBox->w(), flRndrBox->h(),
+                                flRndrBox->w(), 50,
                                 "Connecting ... " );
         if ( flStatBox != nullptr )
         {
@@ -487,7 +511,19 @@ int initGUI()
             flStatBox->align( FL_ALIGN_INSIDE | FL_ALIGN_TOP_LEFT );
             flStatBox->labelfont( FL_COURIER );
             flStatBox->labelsize( 20 );
-            flStatBox->labelcolor( 0xEECC8800 );
+            flStatBox->labelcolor( 0x33FF3300 );
+        }
+
+        // overlay status text printing box.
+        flAlarmBox = new Fl_Box( flRndrBox->x(), flRndrBox->h() - 50,
+                                 flRndrBox->w(), 50 );
+        if ( flAlarmBox != nullptr )
+        {
+            flAlarmBox->box( FL_NO_BOX );
+            flAlarmBox->align( FL_ALIGN_INSIDE | FL_ALIGN_BOTTOM_RIGHT );
+            flAlarmBox->labelfont( FL_COURIER );
+            flAlarmBox->labelsize( 20 );
+            flAlarmBox->labelcolor( 0xFF333300 );
         }
         
         flWindow->end();
@@ -521,7 +557,7 @@ void* testRun( void* p )
 		lidarID = lidarSDK->AddLidarByPath(cfg_file_name);
 		if (!lidarID)
 		{
-			printf("config file is not exist:%s\n", cfg_file_name);
+			fprintf( stderr, "config file is not exist:%s\n", cfg_file_name);
 			return nullptr;
 		}
 
@@ -531,11 +567,9 @@ void* testRun( void* p )
 		// Connect to the specified radar and the associated thread pool.
 		if (!lidarSDK->OpenDev(lidarID))
 		{
-			printf("open lidar failed:%d\n", lidarID);
+			fprintf( stderr, "open lidar failed:%d\n", lidarID);
 			return nullptr;
-		}
-        
-		printf("SDK version:%s\n", lidarSDK->GetVersion());
+		}        
 	}
     
     printf( "\n" );
@@ -548,19 +582,6 @@ void* testRun( void* p )
     // Wait for device is closed ...
 	while( lidarSDK != nullptr )
 	{
-        /*
-        pthread_mutex_lock( &pmtxWait );
-        timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_sec += 1;
-        int rc = pthread_cond_timedwait( &pcondData, &pmtxWait, &ts );
-        if ( rc == 0 )
-        {
-        }
-        pthread_mutex_unlock( &pmtxWait );
-        */
-        
-        // === 
         int state = lidarSDK->GetDevState( lidarID );
         
         if ( state == OFFLINE )

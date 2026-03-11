@@ -5,6 +5,7 @@ CCC=gcc
 CXX=g++
 AR=ar
 RL=ranlib
+WRC = windres
 FCG = fltk-config --use-images
 
 SRC_DIR = sdk
@@ -55,18 +56,22 @@ LDFLAGS += $(FLIMGTK_LDF)
 
 LIBOUT =  $(BIN_DIR)/$(TARGET_PKG)
 
+# Windows resource
+WRES = res/resource.rc
+
 # Make object targets from SRCS.
 CXXOBJS    = $(CXXSRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 CXXSVCOBJS = $(CXXSVCSRCS:$(SRC_DIR)/service/%.cpp=$(OBJ_DIR)/service/%.o)
 COBJS      = $(CSRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 CMONGOOBJS = $(CMONGOSRCS:$(MONGO_DIR)/%.c=$(OBJ_DIR)/mongoose/%.o)
+WROBJ      = $(OBJ_DIR)/resource.o
 
 .PHONY: prepare clean demo continue distclean
 
 all: prepare continue
 
 continue: $(BIN_DIR)/$(TARGET_PKG)
-demo: $(BIN_DIR)/demo
+demo: $(WROBJ) $(BIN_DIR)/demo
 
 prepare:
 	@mkdir -p $(BIN_DIR)
@@ -104,6 +109,10 @@ $(CMONGOOBJS): $(OBJ_DIR)/mongoose/%.o: $(MONGO_DIR)/%.c
 	@echo "Building $@ ... "
 	@$(CCC) $(CXXFLAGS) -c $< -o $@
 
+$(WROBJ): $(WRES)
+	@echo "Building windows resource ..."
+	@$(WRC) -i $(WRES) $(WFLAGS) -o $@
+
 $(LIBOUT): $(CXXOBJS) $(COBJS) $(CXXSVCOBJS) $(CMONGOOBJS)
 	@echo "Generating $@ ..."
 	@$(AR) -cr $@ $^
@@ -111,6 +120,6 @@ $(LIBOUT): $(CXXOBJS) $(COBJS) $(CXXSVCOBJS) $(CMONGOOBJS)
 
 $(BIN_DIR)/demo: example/main.cpp
 	@echo "Building DEMO ($@) ..."
-	@$(CXX) $^ $(CXXFLAGS) -mwindows -L$(BIN_DIR) -l$(LIB_NM) $(LDFLAGS) \
+	@$(CXX) $^ $(WROBJ) $(CXXFLAGS) -mwindows -L$(BIN_DIR) -l$(LIB_NM) $(LDFLAGS) \
 	 -static -o $@
 

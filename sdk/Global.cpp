@@ -1324,7 +1324,7 @@ bool vpc_talk(int hcom, int mode, short sn, int len, const char* cmd, int nfetch
 			if (mode == C_PACK)
 			{
 				char* fetch = (char*)result;
-				if (buf[i] == 0x4C && buf[i + 1] == 0x48 && buf[i + 2] == (signed char)0xBC && buf[i + 3] == (signed char)0xFF)
+				if (buf[i] == 0x4C && buf[i + 1] == 0x48 && buf[i + 2] == (int8_t)0xBC && buf[i + 3] == (int8_t)0xFF)
 				{
 					/*int packSN = ((uint32_t)buf[i + 5] << 8) | (uint32_t)buf[i + 4];
 					if (packSN != sn)
@@ -1347,7 +1347,7 @@ bool vpc_talk(int hcom, int mode, short sn, int len, const char* cmd, int nfetch
 			}
 			else if (mode == S_PACK)
 			{
-				if ((buf[i + 2] == (signed char)0xAC && buf[i + 3] == (signed char)0xB8) || (buf[i + 2] == (signed char)0xAC && buf[i + 3] == (signed char)0xff))
+				if ((buf[i + 2] == (int8_t)0xAC && buf[i + 3] == (int8_t)0xB8) || (buf[i + 2] == (int8_t)0xAC && buf[i + 3] == (int8_t)0xff))
 				{
 					//printf("%02x  %02x\n", buf[i + 2], buf[i + 3]);
 					//随机码判定
@@ -2047,8 +2047,8 @@ bool CommunicationAPI::vpc_talk(int hcom, int32_t mode, int16_t sn, \
 			{
 				char* fetch = (char*)result;
 				if (buf[i] == 0x4C && buf[i + 1] == 0x48 \
-                    && buf[i + 2] == (signed char)0xBC 
-                    && buf[i + 3] == (signed char)0xFF)
+                    && buf[i + 2] == (int8_t)0xBC 
+                    && buf[i + 3] == (int8_t)0xFF)
 				{
 					for (size_t j = 0; j < (size_t)nfetch; j++)
 					{
@@ -2067,12 +2067,12 @@ bool CommunicationAPI::vpc_talk(int hcom, int32_t mode, int16_t sn, \
 			}
 			else if (mode == S_PACK)
 			{
-				if ((buf[i + 2] == (signed char)0xAC && buf[i + 3] \
-                                == (signed char)0xB8) \
-                    || (buf[i + 2] == (signed char)0xAC && buf[i + 3] \
-                                   == (signed char)0xff))
+				if ((buf[i + 2] == (int8_t)0xAC && buf[i + 3] \
+                                == (int8_t)0xB8) \
+                    || (buf[i + 2] == (int8_t)0xAC && buf[i + 3] \
+                                   == (int8_t)0xff))
 				{
-					//随机码判定
+					//Random code determination
 					short packSN = ((uint8_t)buf[i + 5] << 8) | (uint8_t)buf[i + 4];
 					if (packSN != sn)
 						continue;
@@ -2178,7 +2178,7 @@ bool CommunicationAPI::udp_talk_GS_PACK(int fd_udp, const char* ip, \
 	return false;
 }
 
-//配置信息设置
+//Configuration Information Settings
 bool CommunicationAPI::udp_talk_S_PACK(int fd_udp, const char* ip, \
                                        uint16_t port, size_t n, \
                                        const char* cmd, void* result)
