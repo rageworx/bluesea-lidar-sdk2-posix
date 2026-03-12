@@ -47,6 +47,7 @@ uint64_t            lAlarmTm    = 0;
 float               data360[3600] = { -1.f };
 float               rpmHz       = 0.f;
 float               rotCnt      = 0.f;
+float               radTracef   = RADF_MAX;
 uint64_t            lRotMsTm    = 0;
 
 uint64_t getMonoTick()
@@ -284,7 +285,7 @@ void CallBackMsg( int msgtype, void *param, int length )
             char tmpStr[160] = {0};
             snprintf( tmpStr, 160, 
                       "SPAN [%11d:%5d] @@%11d.%d\n"
-                      "Rendering RPM = %.3f (%.3f Hz)", 
+                      "Untrusted measuring RPM = %.3f (%.3f Hz)", 
                       pointdata->idx, 
                       pointdata->spandata.data.N,
                       pointdata->spandata.data.ts[0], 
@@ -390,10 +391,14 @@ void CallBackMsg( int msgtype, void *param, int length )
             fl_imgtk::draw_polygon( dstImg, sightVectors, 3, 0x33663360 );
             
             // un-managed rotattion metering ...
-            if ( ( min_radf > 4.537856f && max_radf < 5.585054f )
-                 || ( min_radf >= 0.0f && max_radf < 0.7853982f ) )
+            if ( min_radf > radTracef )
+            {
+                radTracef = min_radf;
+            }
+            else
             {
                 rotCnt += 1.0f;
+                radTracef = min_radf;
             }
             
             dstImg->uncache();
